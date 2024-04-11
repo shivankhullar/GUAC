@@ -7,12 +7,9 @@ Date: April 2024
 """
 
 import h5py
-#import yt 
-#import pykdgrav
 
 #import matplotlib
 import matplotlib.pyplot as plt
-import math as m
 import numpy as np
 import load_from_snapshot
 
@@ -218,3 +215,21 @@ def get_galaxy_proj_matrix(params, snap_num):
     proj = f['ProjectionMatrix']
     proj = np.array(proj)
     return proj
+
+
+def load_fire_data(dataset, ptype, snapdir, snapnum):
+    """
+    Wrapper around load_from_snapshot.load_from_snapshot to load data from the FIRE simulations.
+
+    Inputs:
+    dataset: string, dataset name
+    ptype: int, particle type
+    snapdir: string, snapshot directory
+    snapnum: int, snapshot number
+
+    Output:
+    data: array, data from the snapshot
+    """
+    data = load_from_snapshot.load_from_snapshot(dataset, ptype, snapdir, snapnum, units_to_physical=True)
+    return data
+
