@@ -1,3 +1,11 @@
+"""
+This file contains utility functions for the FIRE simulations. It includes functions to load data from the FIRE
+simulations, get the galaxy centre and projection matrix, and get the temperature of the gas.
+
+Author: Shivan Khullar
+Date: April 2024
+"""
+
 import h5py
 #import yt 
 #import pykdgrav
