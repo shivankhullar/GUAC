@@ -1,6 +1,8 @@
 """
 This file contains utility functions to get galaxy quantities.
 
+Author: Shivan Khullar
+Date: April 2024
 """
 
 import sys

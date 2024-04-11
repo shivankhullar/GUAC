@@ -9,8 +9,6 @@ Date: April 2024
 import sys
 sys.path.append('/src/generic_utils/')
 from fire_utils import *
-from overall_cloud_props import *
-
 
 
 
@@ -41,10 +39,7 @@ def get_quick_cloud_info(path, snapnum, nmin, vir, cloud_num):
     datContent = [i.strip().split() for i in open(path+filename).readlines()]
     
     
-    #for i in range (0, len(datContent)):
-    #    if (i<8):
-    #        continue
-    
+    # Number of lines before the actual data starts
     header = 8
     i = cloud_num
     cloud_total_mass = float(datContent[i+header][0])
