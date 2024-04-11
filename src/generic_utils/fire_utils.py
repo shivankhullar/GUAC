@@ -233,3 +233,142 @@ def load_fire_data(dataset, ptype, snapdir, snapnum):
     data = load_from_snapshot.load_from_snapshot(dataset, ptype, snapdir, snapnum, units_to_physical=True)
     return data
 
+
+   
+def get_snap_name(snap_num, params):
+    if snap_num<10:
+        name = "00"+str(snap_num)
+    if snap_num>=10 and snap_num<100:
+        name = "0"+str(snap_num)
+    if snap_num>=100 and snap_num<1000:
+        name = str(snap_num)
+    else:
+        name = str(snap_num)
+    return name
+
+
+
+def get_snap_data(params, snap_num, cosmo=False):
+    """
+    Load the snapshot data for the given snapshot number.
+
+    Parameters
+    ----------
+    params : Params object
+        Object containing the simulation parameters.
+    snap_num : int
+
+    Returns
+    -------
+    snap_data : dictionary containing the snapshot data
+    """
+    snap_data = dict()
+    print ('Loading snap data for snapshot:', snap_num, params.sim)
+
+    if cosmo==True:
+        print ('All data being returned is in cosmological units.')
+        snapdir = params.path+'snapdir_{num}/'.format(num=snap_num)
+        dens = load_from_snapshot.load_from_snapshot('Density', 0, snapdir, snap_num, units_to_physical=False)
+        coords = load_from_snapshot.load_from_snapshot('Coordinates', 0, snapdir, snap_num, units_to_physical=False)
+        masses = load_from_snapshot.load_from_snapshot('Masses', 0, snapdir, snap_num, units_to_physical=False)
+        vels = load_from_snapshot.load_from_snapshot('Velocities', 0, snapdir, snap_num, units_to_physical=False)
+        hsml = load_from_snapshot.load_from_snapshot('SmoothingLength', 0, snapdir, snap_num, units_to_physical=False)
+        int_energy = load_from_snapshot.load_from_snapshot('InternalEnergy', 0, snapdir, snap_num, units_to_physical=False)
+        metal = load_from_snapshot.load_from_snapshot('Metallicity', 0, snapdir, snap_num, units_to_physical=False)
+        n_elec = load_from_snapshot.load_from_snapshot('ElectronAbundance', 0, snapdir, snap_num, units_to_physical=False)
+        pIDs = load_from_snapshot.load_from_snapshot('ParticleIDs', 0, snapdir, snap_num, units_to_physical=False)
+        temps = None
+        F = h5py.File(snapdir+'snapshot_{num}.0.hdf5'.format(num=snap_num), 'r')
+        time = F['Header'].attrs['Time']
+
+    
+    else:        
+        try:
+            dens = Load_FIRE_Data_Arr('gas', 'dens', snap_num, params)
+        except:
+            dens = Load_FIRE_Data('Density', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            print('Loaded densities...')
+        try:
+            coords = Load_FIRE_Data_Arr('gas', 'coords', snap_num, params)
+        except:
+            coords = Load_FIRE_Data('Coordinates', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            print('Loaded coords...')
+        try:
+            masses = Load_FIRE_Data_Arr('gas', 'masses', snap_num, params)
+        except:
+            masses = Load_FIRE_Data('Masses', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            print('Loaded masses...')
+        try:
+            vels = Load_FIRE_Data_Arr('gas', 'vels', snap_num, params)
+        except:
+            vels = Load_FIRE_Data('Velocities', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            print('Loaded vels...')
+        try:
+            hsml = Load_FIRE_Data_Arr('gas', 'hsml', snap_num, params)
+        except:
+            hsml = Load_FIRE_Data('SmoothingLength', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            print('Loaded hsmls...')
+
+        int_energy = Load_FIRE_Data('InternalEnergy', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+        pIDs = Load_FIRE_Data('ParticleIDs', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+
+        try:
+            temps = Load_FIRE_Data_Arr('gas', 'temps', snap_num, params)
+        except:
+            temps = None
+            metal = Load_FIRE_Data('Metallicity', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            n_elec = Load_FIRE_Data('ElectronAbundance', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            
+    f_neutral = np.zeros(0)
+    f_molec = np.zeros(0)
+    z_tot = metal[:, 0]
+    z_he = metal[:, 1]
+
+    value='Temp'
+    if temps is None:
+        temps = get_temperature(int_energy, z_he, n_elec, z_tot, dens, f_neutral=f_neutral, f_molec=f_molec, key=value)
+    weights = get_temperature(int_energy, z_he, n_elec, z_tot, dens, f_neutral=f_neutral, f_molec=f_molec, key='Weight')
+
+    m_p = 1.67e-24          # mass of proton (g)
+    k_B = 1.38e-16          # Boltzmann constant (erg/K)
+    cs = np.sqrt(k_B*temps/(weights*m_p))/(1e5)  # in km/s
+
+    snap_data['dens'] = dens
+    snap_data['coords'] = coords
+    snap_data['masses'] = masses
+    snap_data['temps'] = temps
+    snap_data['cs'] = cs
+    snap_data['vels'] = vels
+    snap_data['hsml'] = hsml
+    snap_data['pIDs'] = pIDs
+    snap_data['int_energy'] = int_energy
+    if cosmo==True:
+        snap_data['time'] = time
+    else:
+        snap_data['time'] = 0
+
+
+    # Now do the same for star data
+    if cosmo==True:
+        star_coords = load_from_snapshot.load_from_snapshot('Coordinates', 4, snapdir, snap_num, units_to_physical=False)
+        star_masses = load_from_snapshot.load_from_snapshot('Masses', 4, snapdir, snap_num, units_to_physical=False)
+        star_vels = load_from_snapshot.load_from_snapshot('Velocities', 4, snapdir, snap_num, units_to_physical=False)
+        sfts = load_from_snapshot.load_from_snapshot('StellarFormationTime', 4, snapdir, snap_num, units_to_physical=False)
+        star_pIDs = load_from_snapshot.load_from_snapshot('ParticleIDs', 4, snapdir, snap_num, units_to_physical=False)
+    else:
+        star_coords = Load_FIRE_Data_Arr('star', 'coords', snap_num, params)
+        star_masses = Load_FIRE_Data_Arr('star', 'masses', snap_num, params)
+        star_ages = Load_FIRE_Data_Arr('star', 'ages', snap_num, params)
+        star_pIDs = Load_FIRE_Data('ParticleIDs', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+        star_vels = Load_FIRE_Data('Velocities', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+        sfts = Load_FIRE_Data('StellarFormationTime', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+
+    snap_data['star_coords'] = star_coords
+    snap_data['star_masses'] = star_masses
+    if not cosmo: snap_data['star_ages'] = star_ages
+    snap_data['star_pIDs'] = star_pIDs
+    snap_data['star_vels'] = star_vels
+    snap_data['sfts'] = sfts
+
+    
+    return snap_data
