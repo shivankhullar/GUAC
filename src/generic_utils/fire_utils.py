@@ -173,3 +173,40 @@ def get_temperature(internal_egy_code, helium_mass_fraction, electron_abundance,
     if('Weight' in key or 'weight' in key): return mu;
     if('Number' in key or 'number' in key): return mass_density * 404.621 / mu;
     return T;
+
+
+
+def get_galaxy_centre(params, snap_num):
+    """
+    Get the galaxy centre from the image data file (center_and_proj_(snapnum).hdf5)
+
+    Inputs:
+    params: object, parameters object
+    snap_num: int, snapshot number
+
+    Output:
+    centre: array, galaxy centre
+    """
+    fname = params.image_path+params.image_filename_prefix+str(snap_num)+params.image_filename_suffix
+    f = h5py.File(fname,'r')
+    #f.keys()
+    centre = np.array(f['centering'])
+    return centre
+
+def get_galaxy_proj_matrix(params, snap_num):
+    """
+    Get the galaxy projection matrix from the image data file (center_and_proj_(snapnum).hdf5)
+
+    Inputs:
+    params: object, parameters object
+    snap_num: int, snapshot number
+
+    Output:
+    proj: array (3x3), projection matrix
+    """
+    fname = params.image_path+params.image_filename_prefix+str(snap_num)+params.image_filename_suffix
+    f = h5py.File(fname,'r')
+    #f.keys()
+    proj = f['ProjectionMatrix']
+    proj = np.array(proj)
+    return proj
