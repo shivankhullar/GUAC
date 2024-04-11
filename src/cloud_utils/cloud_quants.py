@@ -206,55 +206,352 @@ def get_cloud_box(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_box=
 
 
 
+def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_box=None, \
+                     snap_data=None, project=False, center_wrt_galaxy=False, star_data=True):
+    """ 
+    Function to get the quantities of a cloud.
 
-
-
-
-class CloudChain():
+    Inputs:
+        cloud_num: Cloud number.
+        snap_num: Snapshot number.
+        params: Parameters of the simulation.
+        cloud_reff_factor: Factor to multiply the cloud effective radius to get the box size.
+        cloud_box: If True, a box around the cloud is defined. If a dictionary, that is used as the box.
+        snap_data: If not None, the snapshot data is provided.
+        project: If True, the cloud is projected.
+        center_wrt_galaxy: If True, the cloud is centered wrt the galaxy.
+    
+    Outputs:
+        dens: Density of the cloud.
+        vels: Velocities of the cloud.
+        coords: Coordinates of the cloud.
+        masses: Masses of the cloud.
+        hsml: Smoothing lengths of the cloud.
+        cs: Sound speeds of the cloud.
     """
-    Class to find out a cloud chain stemming from the first cloud.
-    """
-    def __init__(self, cloud_num, snap_num, params):
-        file_name = params.path+params.sub_dir+params.filename_prefix+params.frac_thresh\
-                    +"_"+str(params.start_snap)+"_"+str(params.last_snap)+"_names"+".txt"
-        my_file = open(file_name, "r")
+    #if project==True:
+    #    print ('This will only project if cloud_box=False ...')
 
-        content_list = my_file.readlines()
-        cloud_list_names = []
-        for i in range (0, len(content_list)-1):             #The last line is just \n.
-            #if 
-            names = str.split(content_list[i], ', ')
-            if names[-1]=='\n':
-                names = names[:-1]
+    _, cloud_centre, cloud_reff = get_cloud_info(params.path, snap_num, \
+                                                            params.nmin, params.vir, cloud_num)
+    
+    mode = 'box'
+    # Define the box around the cloud
+    if cloud_box is None or cloud_box == True:
+        #cloud_box = CloudBox()
+        cloud_box = dict.fromkeys(['x_max', 'x_min', 'y_max', 'y_min', 'z_max', 'z_min']) 
+        cloud_box['x_max'] = cloud_centre[0] + cloud_reff_factor*cloud_reff
+        cloud_box['x_min'] = cloud_centre[0] - cloud_reff_factor*cloud_reff
 
-            cloud_list_names.append(names)
+        cloud_box['y_max'] = cloud_centre[1] + cloud_reff_factor*cloud_reff
+        cloud_box['y_min'] = cloud_centre[1] - cloud_reff_factor*cloud_reff
 
-        self.cloud_list = []
-        self.cloud_nums = []
-        self.snap_nums = []
-        search_key = get_cloud_name(cloud_num, params)+'Snap'+str(snap_num)
-        flag = 0
-        for i in range(0, len(cloud_list_names)):
-            if search_key in cloud_list_names[i]:
-                print ('Search key', search_key, i)
-                self.cloud_list = cloud_list_names[i]
+        cloud_box['z_max'] = cloud_centre[2] + cloud_reff_factor*cloud_reff
+        cloud_box['z_min'] = cloud_centre[2] - cloud_reff_factor*cloud_reff
+    # If cloud_box is a dictionary use that, else just return the cloud from get_cloud_quants_hdf5
+    elif type(cloud_box) == dict:
+        print ('Using the cloud box provided...')
+    if cloud_box == False:
+        mode = 'cloud'
 
-                flag = 1
-                break
+
+    #print ('Loading particle data...')
+    if mode == 'cloud':
+        # Load the particle data
+        dens, vels, coords, masses, hsml, cs, temps = get_cloud_quants_hdf5(cloud_num, snap_num, params)
+        if project:
+            print ("Projecting the cloud...")
+
+            proj = Get_Galaxy_Proj_Matrix(params, snap_num)
+            proj_gas_coords = []
+            for i in range(0, len(gas_coords)):
+                proj_gas_coords.append(np.matmul(proj, gas_coords[i]))
+            proj_gas_coords = np.array(proj_gas_coords)
+
+            if center_wrt_galaxy:
+                print ('Centering wrt galaxy...')
+                gal_centre = Get_Galaxy_Centre(params, snap_num)    
+                proj = Get_Galaxy_Proj_Matrix(params, snap_num)
+                gal_centre_proj = np.matmul(proj, gal_centre)
+                proj_gas_coords = proj_gas_coords - gal_centre_proj
+
+            return dens, vels, proj_gas_coords, masses, hsml, cs
         
-        for cloud in self.cloud_list:
-            self.cloud_nums.append(int(cloud.split('Snap')[0].split('Cloud')[1]))
-            self.snap_nums.append(int(cloud.split('Snap')[1]))
-        
-        #if flag==0:
-        #    search_key = get_cloud_name0(cloud_num, params)+'Snap'+str(snap_num)
-        #    for i in range(0, len(cloud_list_names)):
-        #        if search_key in cloud_list_names[i]:
-        #            print ('Search key', search_key, i)
-        #            self.cloud_list = cloud_list_names[i]
-        #            flag = 1
-        #            break
-                    
-        if flag==0:
-            print ('Cloud not found :(')
+        if star_data:
+            if snap_data is not None:
+                star_coords = snap_data['star_coords']
+                star_masses = snap_data['star_masses']
+            else:
+                star_coords = Load_FIRE_Data_Arr('star', 'coords', snap_num, params)
+                star_masses = Load_FIRE_Data_Arr('star', 'masses', snap_num, params)
             
+            dists = np.sqrt((star_coords[:,0]-cloud_centre[0])**2+\
+                            (star_coords[:,1]-cloud_centre[1])**2+\
+                            (star_coords[:,2]-cloud_centre[2])**2)
+            star_inds = np.where(dists<=cloud_reff)[0]
+            final_star_coords = star_coords[star_inds]
+            final_star_masses = star_masses[star_inds]
+            
+            return dens, vels, coords, masses, hsml, cs, temps, \
+                    final_star_coords, final_star_masses
+
+        return dens, vels, coords, masses, hsml, cs, temps
+
+    if mode == 'box':
+        if snap_data is not None:
+            # Select the particles within the box
+            coords = snap_data['coords']
+            masses = snap_data['masses']
+            hsml = snap_data['hsml']
+            dens = snap_data['dens']
+            temps = snap_data['temps']
+            vels = snap_data['vels']
+            cs = snap_data['cs']
+            int_energy = snap_data['int_energy']
+            pIDs = snap_data['pIDs']
+        else:
+            # Load the snapshot data
+            dens = Load_FIRE_Data_Arr('gas', 'dens', snap_num, params)
+            coords = Load_FIRE_Data_Arr('gas', 'coords', snap_num, params)
+            masses = Load_FIRE_Data_Arr('gas', 'masses', snap_num, params)
+            temps = Load_FIRE_Data_Arr('gas', 'temps', snap_num, params)
+            vels = Load_FIRE_Data_Arr('gas', 'vels', snap_num, params)
+            hsml = Load_FIRE_Data_Arr('gas', 'hsml', snap_num, params)
+            int_energy = Load_FIRE_Data('InternalEnergy', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            metal = Load_FIRE_Data('Metallicity', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            n_elec = Load_FIRE_Data('ElectronAbundance', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            f_neutral = np.zeros(0)
+            f_molec = np.zeros(0)
+            z_tot = metal[:, 0]
+            z_he = metal[:, 1]
+
+            value='Temp'
+            if not temps:
+                temps = get_temperature(int_energy, z_he, n_elec, z_tot, dens, f_neutral=f_neutral, f_molec=f_molec, key=value)
+            weights = get_temperature(int_energy, z_he, n_elec, z_tot, dens, f_neutral=f_neutral, f_molec=f_molec, key='Weight')
+
+            m_p = 1.67e-24          # mass of proton (g)
+            k_B = 1.38e-16          # Boltzmann constant (erg/K)
+            cs = np.sqrt(k_B*temps/(weights*m_p))/(1e5)  # in km/s
+
+
+        inds_x = np.where((coords[:,0]>cloud_box['x_min'])&(coords[:,0]<cloud_box['x_max']))[0]
+        inds_y = np.where((coords[:,1]>cloud_box['y_min'])&(coords[:,1]<cloud_box['y_max']))[0]
+        inds_z = np.where((coords[:,2]>cloud_box['z_min'])&(coords[:,2]<cloud_box['z_max']))[0]
+        final_inds = np.intersect1d(np.intersect1d(inds_x, inds_y), inds_z)
+    
+        coords_x = np.take(coords[:,0], final_inds)
+        coords_y = np.take(coords[:,1], final_inds)
+        coords_z = np.take(coords[:,2], final_inds)
+        final_gas_coords = np.array([coords_x, coords_y, coords_z]).T
+
+        final_gas_masses = np.take(masses, final_inds)
+        final_gas_smoothing_lengths = np.take(hsml, final_inds)
+        final_gas_densities = np.take(dens, final_inds)
+        final_gas_temps = np.take(temps, final_inds)
+        final_gas_cs = np.take(cs, final_inds)
+        final_gas_int_energy = np.take(int_energy, final_inds)
+        final_temps = np.take(temps, final_inds)
+        vels_x = np.take(vels[:,0], final_inds)
+        vels_y = np.take(vels[:,1], final_inds)
+        vels_z = np.take(vels[:,2], final_inds)
+        final_gas_vels = np.array([vels_x, vels_y, vels_z]).T
+        final_gas_pIDs = pIDs[final_inds]
+        
+        if star_data:
+            if snap_data is not None:
+                star_coords = snap_data['star_coords']
+                star_masses = snap_data['star_masses']
+                star_vels = snap_data['star_vels']
+                star_pIDs = snap_data['star_pIDs']
+                sfts = snap_data['sfts']
+            else:
+                star_coords = Load_FIRE_Data_Arr('star', 'coords', snap_num, params)
+                star_masses = Load_FIRE_Data_Arr('star', 'masses', snap_num, params)
+                star_vels = Load_FIRE_Data('Velocities', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+                star_pIDs = Load_FIRE_Data('ParticleIDs', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+                sfts = Load_FIRE_Data('StellarFormationTime', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+
+            inds_x = np.where((star_coords[:,0]>cloud_box['x_min'])&(star_coords[:,0]<cloud_box['x_max']))[0]
+            inds_y = np.where((star_coords[:,1]>cloud_box['y_min'])&(star_coords[:,1]<cloud_box['y_max']))[0]
+            inds_z = np.where((star_coords[:,2]>cloud_box['z_min'])&(star_coords[:,2]<cloud_box['z_max']))[0]
+            final_inds = np.intersect1d(np.intersect1d(inds_x, inds_y), inds_z)
+
+            final_star_coords = star_coords[final_inds]
+            final_star_masses = star_masses[final_inds]
+            vels_x = np.take(star_vels[:,0], final_inds)
+            vels_y = np.take(star_vels[:,1], final_inds)
+            vels_z = np.take(star_vels[:,2], final_inds)
+            final_star_vels = np.array([vels_x, vels_y, vels_z]).T
+            final_star_pIDs = star_pIDs[final_inds]
+            final_sfts = sfts[final_inds]
+
+
+            return final_gas_coords, final_gas_masses, final_gas_smoothing_lengths, \
+                final_gas_densities, final_gas_temps, final_gas_vels, final_gas_cs, \
+                final_gas_int_energy, final_temps, final_gas_pIDs, final_star_coords, final_star_masses, \
+                    final_star_pIDs, final_star_vels, final_sfts, cloud_box
+
+        else:
+            return final_gas_coords, final_gas_masses, final_gas_smoothing_lengths, \
+                    final_gas_densities, final_gas_temps, final_gas_vels, final_gas_cs, \
+                        final_gas_int_energy, final_gas_pIDs, cloud_box
+
+    return None
+
+
+
+
+
+########################################################################################
+########################### Getting cloud population quantities   ######################
+########################################################################################
+
+
+class CloudPopData():
+    def __init__(self, cloud_total_masses, cloud_reffs, cloud_centres, cloud_hmrads, \
+                 cloud_num_parts, cloud_virs, z_dists, r_gal_dists, cloud_nums):
+        self.cloud_total_masses = cloud_total_masses
+        self.cloud_reffs = cloud_reffs
+        self.cloud_centres = cloud_centres
+        self.cloud_hmrads = cloud_hmrads
+        self.cloud_num_parts = cloud_num_parts
+        self.cloud_virs = cloud_virs
+        self.z_dists = z_dists
+        self.r_gal_dists = r_gal_dists
+        self.cloud_nums = cloud_nums
+
+    
+def get_cloud_pop_data(params, snapnum, nmin, vir, mw_cut=False):
+    """ 
+    Function to get the cloud population data for a snapshot. 
+
+    Inputs:
+        params: Parameters of the simulation.
+        snapnum: Snapshot number.
+        nmin: Minimum number of particles in a cloud.
+        vir: Virial parameter.
+    
+    Outputs:
+        cloud_pop_data: Cloud population data.
+    """
+    cloud_total_masses, cloud_reffs, cloud_centress, cloud_hmrads, \
+        cloud_num_parts, cloud_virs, z_dists, r_gal_dists, cloud_nums = \
+    read_cloud_summary_data(params.path, snapnum, nmin, vir, params, params.r_gal, params.h, \
+                            MW_cut=mw_cut)
+    cloud_pop_data = CloudPopData(cloud_total_masses, cloud_reffs, cloud_centress, \
+                                  cloud_hmrads, cloud_num_parts, cloud_virs, z_dists, r_gal_dists, cloud_nums)
+    return cloud_pop_data
+
+
+def read_cloud_summary_data(path, snapnum, nmin, vir, params, r_gal, h, MW_cut=False):
+    """ 
+    Function to read the cloud summary data for a snapshot.
+
+    Inputs:
+        path: Path to the data.
+        snapnum: Snapshot number.
+        nmin: Minimum number of particles in a cloud.
+        vir: Virial parameter.
+        params: Parameters of the simulation.
+        r_gal: Radius of the galaxy.
+        h: Height of the galaxy.
+        MW_cut: If True, only clouds within the galaxy are selected.
+    
+    Outputs:
+        cloud_total_masses: Total mass of the clouds.
+        cloud_reffs: Effective radii of the clouds.
+        cloud_centress: Centres of the clouds.
+        cloud_hmrads: Half-mass radii of the clouds.
+        cloud_num_parts: Number of particles in the clouds.
+        cloud_virs: Virial parameters of the clouds.
+        z_dists: Distances of the clouds from the galactic plane.
+        r_gal_dists: Distances of the clouds from the galactic center.
+    """
+    #r_gal = 25
+    #h = 3
+    path = path+'CloudPhinderData/n{nmin}_alpha{vir}/'.format(nmin=nmin, vir=vir)
+    filename = 'bound_{snap_num}_n{nmin}_alpha{vir}.dat'.format(snap_num = snapnum, nmin = nmin, vir=vir)
+    datContent = [i.strip().split() for i in open(path+filename).readlines()]
+    
+    cloud_total_mass_list = []
+    cloud_centre_list = []
+    cloud_reff_list = []
+    cloud_hmrad_list = []
+    cloud_num_part_list = []
+    cloud_vir_list = []
+    z_dists = []
+    r_gal_dists = []
+    cloud_nums = []
+
+    for i in range (0, len(datContent)):
+        j = i-8
+        if (i<8):
+            continue
+        cloud_total_mass = float(datContent[i][0])
+        cloud_centre_x = float(datContent[i][1])
+        cloud_centre_y = float(datContent[i][2])
+        cloud_centre_z = float(datContent[i][3])
+        cloud_reff = float(datContent[i][7])
+        cloud_hmrad = float(datContent[i][8])
+        cloud_num_part = float(datContent[i][9])
+        cloud_vir = float(datContent[i][10])
+        
+        if cloud_num_part<32:
+            continue
+        
+        
+        gal_centre = Get_Galaxy_Centre(params, snapnum)
+        dist = np.sqrt((cloud_centre_x-gal_centre[0])**2+(cloud_centre_y-gal_centre[1])**2+\
+                      (cloud_centre_z-gal_centre[2])**2)
+        
+        cloud_centre = np.array([cloud_centre_x, cloud_centre_y, cloud_centre_z])
+        
+        ## z-distance from galactic center
+        proj = Get_Galaxy_Proj_Matrix(params, snapnum)
+        cloud_centre_proj = np.matmul(proj, cloud_centre)
+        gal_centre_proj = np.matmul(proj, gal_centre)
+
+        z_dist = cloud_centre_proj[2] - gal_centre_proj[2]
+        
+        if MW_cut:
+            if dist>=r_gal or np.abs(z_dist)>=h:
+                continue
+        #if dist>=r_gal or np.abs(z_dist)>=h:
+        #    continue
+        #print (cloud_centre, cloud_centre_proj, gal_centre, gal_centre_proj, z_dist)
+        #cloud_z_dists.append(z_dist)
+        #cloud_inds.append(i)
+        
+        
+        #if dist>=25:
+        #    continue
+
+        cloud_total_mass_list.append(cloud_total_mass)
+        cloud_centre_list.append(np.array([cloud_centre_proj[0], cloud_centre_proj[1], cloud_centre_proj[2]]))
+        cloud_reff_list.append(cloud_reff)
+        cloud_hmrad_list.append(cloud_hmrad)
+        cloud_num_part_list.append(cloud_num_part)
+        cloud_vir_list.append(cloud_vir)
+        z_dists.append(z_dist)
+        r_gal_dists.append(dist)
+        cloud_nums.append(j)
+    
+    cloud_total_masses = np.array(cloud_total_mass_list)
+    cloud_reffs = np.array(cloud_reff_list)
+    cloud_centress = np.array(cloud_centre_list)
+    cloud_hmrads = np.array(cloud_hmrad_list)
+    cloud_num_parts = np.array(cloud_num_part_list)
+    cloud_virs = np.array(cloud_vir_list)
+    z_dists = np.array(z_dists)
+    r_gal_dists = np.array(r_gal_dists)
+    cloud_nums = np.array(cloud_nums)
+    
+    #print (cloud_num_parts)
+    
+    return cloud_total_masses, cloud_reffs, cloud_centress, \
+        cloud_hmrads, cloud_num_parts, cloud_virs, z_dists, \
+            r_gal_dists, cloud_nums
+
+
+
