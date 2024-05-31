@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-snapshot_scale_factors: "Find the scale factors/time attribute of the snapshots in a given directory."
+read_snapshot_times: "Find the scale factors/time attribute of the snapshots in a given directory."
 
-Usage: snapshot_scale_factors.py [options]
+Usage: read_snapshot_times.py [options]
 
 Options:
     -h, --help                  Show this screen
