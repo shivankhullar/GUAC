@@ -12,7 +12,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import load_from_snapshot
-
+import constants
 
 class Params():
     """
@@ -235,7 +235,17 @@ def load_fire_data(dataset, ptype, snapdir, snapnum):
 
 
    
-def get_snap_name(snap_num, params):
+def get_snap_name(snap_num):
+    """
+    Get the snapshot name for the given snapshot number.
+
+    Inputs:
+    snap_num: int, snapshot number
+    params: object, parameters object
+
+    Output:
+    name: string, snapshot name
+    """
     if snap_num<10:
         name = "00"+str(snap_num)
     if snap_num>=10 and snap_num<100:
@@ -246,6 +256,28 @@ def get_snap_name(snap_num, params):
         name = str(snap_num)
     return name
 
+
+
+def get_cloud_name(cloud_num, params):
+    """
+    Get the cloud name for the given cloud number.
+
+    Inputs:
+    cloud_num: int, cloud number
+    params: object, parameters object
+
+    Output:
+    name: string, cloud name
+    """
+    if cloud_num<10:
+        name = params.cloud_prefix+"00"+str(cloud_num)
+    if cloud_num>=10 and cloud_num<100:
+        name = params.cloud_prefix+"0"+str(cloud_num)
+    if cloud_num>=100 and cloud_num<1000:
+        name = params.cloud_prefix+str(cloud_num)
+    else:
+        name = params.cloud_prefix+str(cloud_num)
+    return name
 
 
 def get_snap_data(params, snap_num, cosmo=False):
