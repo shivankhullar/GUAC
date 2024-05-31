@@ -1,7 +1,16 @@
 
-
-
+"""
 def get_cloud_name(cloud_num, params):
+    
+    Get the cloud name for the given cloud number.
+
+    Inputs:
+    cloud_num: int, cloud number
+    params: object, parameters object
+
+    Output:
+    name: string, cloud name
+    
     if cloud_num<10:
         name = params.cloud_prefix+"00"+str(cloud_num)
     if cloud_num>=10 and cloud_num<100:
@@ -11,8 +20,7 @@ def get_cloud_name(cloud_num, params):
     else:
         name = params.cloud_prefix+str(cloud_num)
     return name
-        
-
+"""
 
 
 class CloudChain():
