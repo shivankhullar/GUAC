@@ -10,6 +10,7 @@ scipy
 matplotlib
 docopt
 pfh_python
+meshoid
 ```
 
 If you're working with CloudPhinder data, store all your data in ```xyz/CloudPhinder/nXvY/``` where X and Y are the minimum densities and virial parameters respectively. 
