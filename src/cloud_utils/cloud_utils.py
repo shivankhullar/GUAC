@@ -23,6 +23,7 @@ def get_cloud_name(cloud_num, params):
 """
 
 
+
 class CloudChain():
     """
     Class to find out a cloud chain stemming from the first cloud.
@@ -46,6 +47,7 @@ class CloudChain():
         self.cloud_nums = []
         self.snap_nums = []
         search_key = get_cloud_name(cloud_num, params)+'Snap'+str(snap_num)
+        self.search_key = search_key
         flag = 0
         for i in range(0, len(cloud_list_names)):
             if search_key in cloud_list_names[i]:
@@ -71,3 +73,4 @@ class CloudChain():
         if flag==0:
             print ('Cloud not found :(')
             
+
