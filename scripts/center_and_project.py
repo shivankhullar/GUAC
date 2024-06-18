@@ -14,7 +14,7 @@ Options:
 from docopt import docopt
 from gal_viz_utils import *
 from meshoid import Meshoid
-#matplotlib.use('Agg')
+matplotlib.use('Agg')
 from matplotlib import colors
 #from visualization import *
 from visualization.image_maker import edgeon_faceon_projection
@@ -35,18 +35,38 @@ def make_photo(path, snapnum, save_path):
 
 
 
+def convert_to_array(string):
+    li = list(string.split(","))
+    return np.array(li).astype(np.int32)
+
+
 if __name__ == '__main__':
     args = docopt(__doc__)
     path = args['--path']
     #snapdir = args['--snapdir']
-    snapnum = int(args['--snapnum'])
+    #spacing = convert_to_array(args['--spacing'])
+    save_path = path+args['--save_path']
+    #snapnum = int(args['--snapnum'])
+    snapnum = convert_to_array(args['--snapnum'])
+
+    if len(snapnum)==1:
+        snapnum = snapnum[0]
+        print ("Finding center and projection matrix...")
+        make_photo(path, snapnum, save_path)
+    
+    else:
+        print ("Snapnum is a range, finding center and projection matrix for each snapshot...")
+        for snap in range(snapnum[0], snapnum[1]+1):
+            print ("Snapshot: ", snap)
+            print ("Finding center and projection matrix...")
+            make_photo(path, snap, save_path)
     #r_gal = float(args['--r_gal'])
     #h = float(args['--h'])
-    save_path = path+args['--save_path']
+    
     
     #image_path = path+'img_data/'
 
-    print ("Finding center and projection matrix...")
-    make_photo(path, snapnum, save_path)
+    #print ("Finding center and projection matrix...")
+    #make_photo(path, snapnum, save_path)
     #image_path = save_path
         
