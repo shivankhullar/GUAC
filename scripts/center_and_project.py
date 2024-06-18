@@ -12,8 +12,11 @@ Options:
 """
 
 from docopt import docopt
-from gal_viz_utils import *
+from galaxy_utils.gal_utils import *
+from generic_utils.fire_utils import *
+#from gal_viz_utils import *
 from meshoid import Meshoid
+import matplotlib
 matplotlib.use('Agg')
 from matplotlib import colors
 #from visualization import *
