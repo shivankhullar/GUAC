@@ -1,0 +1,6 @@
+src/__pycache__
+src/*.egg-info
+src/dist
+src/build
+src/*/__pycache__
+scripts/__pycache__
