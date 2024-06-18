@@ -62,13 +62,13 @@ def get_cloud_quants_hdf5(cloud_num, snap_num, params):
         params: the parameters (see src/fire_utils.py)
 
     Outputs:
-        dens: the density of the cloud
-        vels: the velocities of the cloud
-        coords: the coordinates of the cloud
-        masses: the gas masses of the cloud
-        hsml: the smoothing lengths of the cloud
-        cs: the sound speeds of the cloud
-
+        dens: the density of the particles in the cloud
+        vels: the velocities of the particles in the cloud
+        coords: the coordinates of the particles in the cloud
+        masses: the gas masses of the particles in the cloud
+        hsml: the smoothing lengths of the particles in the cloud
+        cs: the sound speeds of the particles in the cloud
+        temps: the temperatures of the particles in the cloud
     """
     file_name = params.path+params.cph_sub_dir+params.hdf5_file_prefix+str(snap_num)+\
                 '_n{nmin}_alpha{vir}'.format(nmin=params.nmin, vir=params.vir)+'.hdf5'
