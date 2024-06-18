@@ -46,13 +46,14 @@ class Params():
     h: float, scale height
     """
     def __init__(self, path = "../../FIRE/m12i_res7100/", nmin = 10, vir = 2, \
-                 sub_dir = "CloudTracker/n{nmin}_alpha{vir}/".format(nmin=10, vir=2), \
-                 start_snap = 590, last_snap = 600, filename_prefix="Linked_Clouds_", cloud_num_digits = 3, \
-                 snapshot_num_digits = 3, cloud_prefix = "Cloud", snapshot_prefix="Snap", age_cut=2.21, \
-                dat_file_header_size=8, star_data_sub_dir = "StarData/", cph_sub_dir="CloudPhinderData/",\
-                image_path="../Paper/VizImages/m12i_res7100/img_data/", img_fname_pre='image_faceon_s0',\
-                img_fname_suf='_fov0035_Ngb32_star.hdf5', hdf5_file_prefix = 'Clouds_', frac_thresh='thresh0.0', \
-                gas_data_sub_dir = 'GasData/', sim='m12i_final_fb_57k', r_gal=25, h=0.4):
+                    sub_dir = "CloudTrackerData/n{nmin}_alpha{vir}/".format(nmin=10, vir=2), \
+                    start_snap = 590, last_snap = 600, filename_prefix="Linked_Clouds_", cloud_num_digits = 3, \
+                    snapshot_num_digits = 3, cloud_prefix = "Cloud", snapshot_prefix="Snap", age_cut=1, \
+                    dat_file_header_size=8, gas_data_sub_dir = 'GasData/', star_data_sub_dir = "StarData/", \
+                    cph_sub_dir="CloudPhinderData/", image_path="../Paper/VizImages/m12i_res7100/img_data/", \
+                    img_fname_pre='image_faceon_s0', img_fname_suf='_fov0035_Ngb32_star.hdf5', \
+                    hdf5_file_prefix = 'Clouds_', frac_thresh='thresh0.0', sim='m12i_final_fb_57k', \
+                    r_gal=25, h=0.4):
 
         self.sim=sim
         self.path=path+sim+'/'

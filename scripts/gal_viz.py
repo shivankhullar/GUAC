@@ -1,31 +1,33 @@
 #!/usr/bin/env python
 """
-gal_viz: "Visualize galaxy snapshot"
+gal_viz: "Visualize a galaxy snapshot -- plot the surface density of gas particles in a galaxy as seen from a face-on view"
 
-Usage: snapshot_scale_factors.py [options]
+Usage: gal_viz.py [options]
 
 Options:
-    -h, --help                  Show this screen
-    --snapdir=<snapdir>         Are snapshots in a snapdir directory? [default: True]
-    --path=<path>               Path to the simulation directory [default: ./]
-    --snapnum=<snapnum>         Snapshot number [default: 600]
-    --r_gal=<r_gal>             Galaxy radius [default: 25]
-    --h=<h>                     Scale height [default: 0.4] 
-    --save_path=<save_path>     Path to save the images [default: img_data/]
-    --gas_data_sub_dir=<gas_data_sub_dir>   Subdirectory containing gas data [default: GasData/]
-    --star_data_sub_dir=<star_data_sub_dir> Subdirectory containing star data [default: StarData/]
-    --img_filename_prefix=<img_filename_prefix>   Prefix for image filename [default: center_proj_]
-    --img_filename_suffix=<img_filename_suffix>   Suffix for image filename [default: .hdf5]
-    --img_filename_mode=<img_filename_mode>       Mode for image filename [default: 0]
-    --center_and_proj=<center_and_proj>   Find center and project galaxy [default: False]
+    -h, --help                                          Show this screen
+    --snapdir=<snapdir>                                 Are snapshots in a snapdir directory? [default: True]
+    --path=<path>                                       Path to the simulation directory [default: ./]
+    --sim=<sim>                                         Simulation name [default: ]
+    --snapnum=<snapnum>                                 Snapshot number [default: 600]
+    --r_gal=<r_gal>                                     Galaxy radius [default: 25]
+    --h=<h>                                             Scale height [default: 0.4] 
+    --save_path=<save_path>                             Path to save the images [default: img_data/]
+    --colorbar_range=<colorbar_range>                   Range for colorbar [default: 1e-2,3e3]
+    --gas_data_sub_dir=<gas_data_sub_dir>               Subdirectory containing gas data [default: GasData/]
+    --star_data_sub_dir=<star_data_sub_dir>             Subdirectory containing star data [default: StarData/]
+    --img_filename_prefix=<img_filename_prefix>         Prefix for image filename [default: center_proj_]
+    --img_filename_suffix=<img_filename_suffix>         Suffix for image filename [default: .hdf5]
+    --img_filename_mode=<img_filename_mode>             Mode for image filename [default: 0]
+    --center_and_proj=<center_and_proj>                 Find center and project galaxy [default: False]
 """
 
 from docopt import docopt
-from gal_viz_utils import *
+from galaxy_utils.gal_utils import *
+from generic_utils.fire_utils import *
+from generic_utils.script_utils import *
 from meshoid import Meshoid
-#matplotlib.use('Agg')
 from matplotlib import colors
-#from visualization import *
 from visualization.image_maker import edgeon_faceon_projection
 import os
 
@@ -42,31 +44,35 @@ def make_photo(path, snapnum, save_path):
 
 
 
-def plot_galaxy(params, snapnum, r_gal, h, save_path, res=1024, snapdir=True):
+def plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, res=1024, snapdir=True):
     try:
         key="gas"
         field="Masses"
         print ("Loading data from GasData array files...")
-        masses = Load_FIRE_Data_Arr(key, field, snapnum, params)
+        masses = load_fire_data_arr(key, field, snapnum, params)
         field="Coordinates"
-        coords = Load_FIRE_Data_Arr(key, field, snapnum, params)
+        coords = load_fire_data_arr(key, field, snapnum, params)
         field="SmoothingLength"
-        hsml = Load_FIRE_Data_Arr(key, field, snapnum, params)
+        hsml = load_fire_data_arr(key, field, snapnum, params)
     except:
-        print ("Loading data from snapshot file...")
+        print ("GasData array files not found... Loading data from snapshot file...")
         if snapdir==True:
             snapdir = params.path+"snapdir_{snapnum}/".format(snapnum=snapnum)
         else:
             print ("Loading data from snapshot file (no snapdir) ...")
             snapdir = params.path
-        masses = Load_FIRE_Data("Masses",0,snapdir,snapnum)
-        print (snapdir, masses.shape)
-        coords = Load_FIRE_Data("Coordinates",0,snapdir,snapnum)
-        hsml = Load_FIRE_Data("SmoothingLength",0,snapdir,snapnum)
+        #print (snapdir, snapnum)
+        masses = load_fire_data("Masses",0,snapdir,snapnum)
+        #print (snapdir, masses.shape)
+        coords = load_fire_data("Coordinates",0,snapdir,snapnum)
+        hsml = load_fire_data("SmoothingLength",0,snapdir,snapnum)
         
 
     gal_quants0 = GalQuants(params, snapnum, r_gal, h)
     gal_quants0.project(coords)
+    #print (gal_quants0.gal_centre)
+    #print (gal_quants0.gal_centre_proj)
+    #print (gal_quants0.proj)
     gal_quants0.add_key("Masses", masses, 1)
     #gal_quants0.add_key("Velocities", velocities0, 3)
     gal_quants0.add_key("SmoothingLength", hsml, 1)
@@ -93,9 +99,11 @@ def plot_galaxy(params, snapnum, r_gal, h, save_path, res=1024, snapdir=True):
     sigma_gas_msun_pc2 = M.SurfaceDensity(M.m,center=center,\
                                             size=image_box_size,res=res)*1e4
 
+    print ('Colorbar range = ', cb_range[0], cb_range[1])
     fig, ax = plt.subplots()
     fig.set_size_inches(10,10)
-    p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=1e-3,vmax=3e3))
+    sigma_gas_msun_pc2[sigma_gas_msun_pc2<cb_range[0]]=cb_range[0]
+    p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=cb_range[0],vmax=cb_range[1]), cmap='inferno')
     #ax[0].set_aspect('equal')
     ax.set_xlim([min_pos[0], max_pos[0]])
     ax.set_ylim([min_pos[1], max_pos[1]])
@@ -148,10 +156,12 @@ def plot_galaxy(params, snapnum, r_gal, h, save_path, res=1024, snapdir=True):
 if __name__ == '__main__':
     args = docopt(__doc__)
     path = args['--path']
+    sim = args['--sim']
     snapdir = args['--snapdir']
     snapnum = int(args['--snapnum'])
     r_gal = float(args['--r_gal'])
     h = float(args['--h'])
+    cb_range = convert_to_array(args['--colorbar_range'], dtype=np.float64)
     save_path = path+args['--save_path']
     gas_data_sub_dir = args['--gas_data_sub_dir']
     star_data_sub_dir = args['--star_data_sub_dir']
@@ -206,13 +216,13 @@ if __name__ == '__main__':
     nmin = 10
     vir = 5
     sub_dir = "CloudTrackerData/n{nmin}_alpha{vir}/".format(nmin=nmin, vir=vir)
-
-
+    #sim=sim
+    image_path = 'img_data/'
 
     params = Params(path, nmin, vir, sub_dir, start_snap, last_snap, filename_prefix, cloud_num_digits, \
-                snapshot_num_digits, cloud_prefix, snapshot_prefix, age_cut, \
-                dat_file_header_size, gas_data_sub_dir, star_data_sub_dir, cph_sub_dir,\
-                image_path, image_filename_prefix,\
-                image_filename_suffix, hdf5_file_prefix, frac_thresh)
+                    snapshot_num_digits, cloud_prefix, snapshot_prefix, age_cut, \
+                    dat_file_header_size, gas_data_sub_dir, star_data_sub_dir, cph_sub_dir,\
+                    image_path, image_filename_prefix,\
+                    image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim, r_gal=r_gal, h=h)
 
-    plot_galaxy(params, snapnum, r_gal, h, save_path, snapdir=snapdir)
+    plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, snapdir=snapdir)
