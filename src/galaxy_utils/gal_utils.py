@@ -5,9 +5,9 @@ Author: Shivan Khullar
 Date: April 2024
 """
 
-import sys
-sys.path.append('/src/generic_utils/')
-from fire_utils import *
+#import sys
+#sys.path.append('/src/generic_utils/')
+from generic_utils.fire_utils import *
 
 class GalQuants():
     """
