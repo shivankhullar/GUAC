@@ -271,14 +271,19 @@ def get_cloud_name(cloud_num, params):
     name: string, cloud name
     """
     if cloud_num<10:
-        name = params.cloud_prefix+"00"+str(cloud_num)
+        name = params.cloud_prefix+"000"+str(cloud_num)
+        return name
     if cloud_num>=10 and cloud_num<100:
-        name = params.cloud_prefix+"0"+str(cloud_num)
+        name = params.cloud_prefix+"00"+str(cloud_num)
+        return name
     if cloud_num>=100 and cloud_num<1000:
-        name = params.cloud_prefix+str(cloud_num)
+        name = params.cloud_prefix+"0"+str(cloud_num)
+        return name
     else:
         name = params.cloud_prefix+str(cloud_num)
-    return name
+        return name
+    return None
+    
 
 
 def get_snap_data(params, snap_num, cosmo=False):
