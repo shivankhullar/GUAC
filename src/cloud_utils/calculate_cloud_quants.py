@@ -8,6 +8,7 @@ Date: June 2024
 
 from generic_utils.fire_utils import *
 from cloud_utils.cloud_quants import *
+import scipy
 
 #### ---------------------------------------------------------------------- ####
 #### ---------------------------------------------------------------------- ####
@@ -160,6 +161,12 @@ def get_epsff_cloud(dens, gas_masses, star_masses):
     Outputs:
         eps_ff: Star formation efficiency per free-fall time.
     """
+    kpc = 3.0857e21
+    Msun = 1.989e33
+    yr = 365.25*24*3600
+    Myr = 1e6*(yr)
+    G = 6.67430e-8  ## in cgs -- cm^3 g^-1 s^-2
+    G = G*Msun*Myr**2/kpc**3
     multi_tff = 1/(np.sum(gas_masses*np.sqrt(32*G*1e10*dens/(3*np.pi)))/np.sum(gas_masses)) # in Myr
     eps_ff = (np.sum(star_masses)*1e10)/(np.sum(gas_masses)*1e10/multi_tff)     # in Msun/Myr over Msun/Myr, so unitless
     return eps_ff

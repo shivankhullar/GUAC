@@ -9,47 +9,14 @@ Date: April 2024
 #import sys
 #sys.path.append('/src/generic_utils/')
 from generic_utils.fire_utils import *
-
-
+from cloud_utils.cloud_utils import *
+import scipy
 
 
 ########################################################################################
 ########################### Getting cloud quantities   #################################
 ########################################################################################
 
-
-def get_quick_cloud_info(path, snapnum, nmin, vir, cloud_num):
-    """
-    This is a function to get the quantities of a cloud from the bound file.
-    
-    Inputs:
-        path: the path to the data
-        snapnum: the snapshot number
-        nmin: the minimum number of particles in a cloud
-        vir: the virial parameter
-        cloud_num: the cloud number
-    
-    Outputs:
-        cloud_total_mass: the total mass of the cloud
-        cloud_centre: the centre of the cloud
-        cloud_reff: the effective radius of the cloud
-    """
-    path = path+'CloudPhinderData/n{nmin}_alpha{vir}/'.format(nmin=nmin, vir=vir)
-    filename = 'bound_{snap_num}_n{nmin}_alpha{vir}.dat'.format(snap_num = snapnum, nmin = nmin, vir=vir)
-    datContent = [i.strip().split() for i in open(path+filename).readlines()]
-    
-    
-    # Number of lines before the actual data starts
-    header = 8
-    i = cloud_num
-    cloud_total_mass = float(datContent[i+header][0])
-    cloud_centre_x = float(datContent[i+header][1])
-    cloud_centre_y = float(datContent[i+header][2])
-    cloud_centre_z = float(datContent[i+header][3])
-    cloud_reff = float(datContent[i+header][7])
-    
-    cloud_centre = np.array([cloud_centre_x, cloud_centre_y, cloud_centre_z])
-    return cloud_total_mass, cloud_centre, cloud_reff
 
 
 
@@ -145,8 +112,8 @@ def get_cloud_box(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_box=
         The velocities of the gas particles within the box
     cloud_box : CloudBox object 
     """
-    _, cloud_centre, cloud_reff = get_cloud_info(params.path, snap_num, \
-                                                            params.nmin, params.vir, cloud_num)
+    _, cloud_centre, cloud_reff, _, _ = get_cloud_quick_info(snap_num, \
+                                                            params.nmin, params.vir, cloud_num, params)
     
     
     # Define the box around the cloud
@@ -227,8 +194,8 @@ def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_b
     #if project==True:
     #    print ('This will only project if cloud_box=False ...')
 
-    _, cloud_centre, cloud_reff = get_cloud_info(params.path, snap_num, \
-                                                            params.nmin, params.vir, cloud_num)
+    _, cloud_centre, cloud_reff, _, _ = get_cloud_quick_info(snap_num, \
+                                                            params.nmin, params.vir, cloud_num, params)
     
     mode = 'box'
     # Define the box around the cloud
