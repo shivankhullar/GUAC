@@ -1,26 +1,55 @@
-
 """
-def get_cloud_name(cloud_num, params):
-    
-    Get the cloud name for the given cloud number.
+This file contains generic utility functions.
+
+Author: Shivan Khullar
+Date: June 2024
+"""
+
+import numpy as np
+from generic_utils.fire_utils import *
+from galaxy_utils.gal_utils import *
+
+
+def get_cloud_quick_info(snapnum, nmin, vir, cloud_num, params):
+    """
+    This is a function to get the quantities of a cloud from the bound_nX_alphaY_snapnum.dat file.
 
     Inputs:
-    cloud_num: int, cloud number
-    params: object, parameters object
-
-    Output:
-    name: string, cloud name
+        path: the path to the data
+        snapnum: the snapshot number
+        nmin: the minimum number of particles in a cloud
+        vir: the virial parameter
+        cloud_num: the cloud number
+        params: the parameters object
     
-    if cloud_num<10:
-        name = params.cloud_prefix+"00"+str(cloud_num)
-    if cloud_num>=10 and cloud_num<100:
-        name = params.cloud_prefix+"0"+str(cloud_num)
-    if cloud_num>=100 and cloud_num<1000:
-        name = params.cloud_prefix+str(cloud_num)
-    else:
-        name = params.cloud_prefix+str(cloud_num)
-    return name
-"""
+    Outputs:
+        cloud_total_mass: the total mass of the cloud
+        cloud_centre: the centre of the cloud
+        cloud_reff: the effective radius of the cloud
+        dist: the distance of the cloud from the galactic centre
+    """
+    path = params.path+params.cph_sub_dir #path+'CloudPhinderData/n{nmin}_alpha{vir}/'.format(nmin=nmin, vir=vir)
+    filename = 'bound_{snap_num}_n{nmin}_alpha{vir}.dat'.format(snap_num = snapnum, nmin = nmin, vir=vir)
+    datContent = [i.strip().split() for i in open(path+filename).readlines()]
+    
+    header = params.dat_file_header_size
+    i = cloud_num
+    cloud_total_mass = float(datContent[i+header][0])
+    cloud_centre_x = float(datContent[i+header][1])
+    cloud_centre_y = float(datContent[i+header][2])
+    cloud_centre_z = float(datContent[i+header][3])
+    cloud_reff = float(datContent[i+header][7])
+    cloud_vir = float(datContent[i+header][10])
+    
+    cloud_centre = np.array([cloud_centre_x, cloud_centre_y, cloud_centre_z])
+    gal_centre = get_galaxy_centre(params, snapnum)
+    dist = np.sqrt((cloud_centre_x-gal_centre[0])**2+(cloud_centre_y-gal_centre[1])**2+\
+                    (cloud_centre_z-gal_centre[2])**2)
+    
+    return cloud_total_mass, cloud_centre, cloud_reff, cloud_vir, dist
+
+
+
 
 
 
