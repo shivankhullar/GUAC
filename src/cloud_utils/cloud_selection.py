@@ -5,6 +5,8 @@ Author: Shivan Khullar
 Date: June 2024
 """
 
+import numpy as np
+from cloud_utils.calculate_cloud_quants import *
 
 class CloudSelector():
     """
