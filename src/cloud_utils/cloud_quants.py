@@ -6,9 +6,9 @@ Date: April 2024
 """
 
 
-import sys
-sys.path.append('/src/generic_utils/')
-from fire_utils import *
+#import sys
+#sys.path.append('/src/generic_utils/')
+from generic_utils.fire_utils import *
 
 
 
@@ -166,12 +166,12 @@ def get_cloud_box(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_box=
     print ('Loading particle data...')
     
     # Load the particle data
-    dens = Load_FIRE_Data_Arr('gas', 'dens', snap_num, params)
-    coords = Load_FIRE_Data_Arr('gas', 'coords', snap_num, params)
-    masses = Load_FIRE_Data_Arr('gas', 'masses', snap_num, params)
-    temps = Load_FIRE_Data_Arr('gas', 'temps', snap_num, params)
-    vels = Load_FIRE_Data_Arr('gas', 'vels', snap_num, params)
-    hsml = Load_FIRE_Data_Arr('gas', 'hsml', snap_num, params)
+    dens = load_fire_data_arr('gas', 'dens', snap_num, params)
+    coords = load_fire_data_arr('gas', 'coords', snap_num, params)
+    masses = load_fire_data_arr('gas', 'masses', snap_num, params)
+    temps = load_fire_data_arr('gas', 'temps', snap_num, params)
+    vels = load_fire_data_arr('gas', 'vels', snap_num, params)
+    hsml = load_fire_data_arr('gas', 'hsml', snap_num, params)
 
     # Select the particles within the box
     inds_x = np.where((coords[:,0]>cloud_box.x_min)&(coords[:,0]<cloud_box.x_max))[0]
@@ -257,7 +257,7 @@ def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_b
         if project:
             print ("Projecting the cloud...")
 
-            proj = Get_Galaxy_Proj_Matrix(params, snap_num)
+            proj = get_galaxy_proj_matrix(params, snap_num)
             proj_gas_coords = []
             for i in range(0, len(gas_coords)):
                 proj_gas_coords.append(np.matmul(proj, gas_coords[i]))
@@ -265,8 +265,8 @@ def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_b
 
             if center_wrt_galaxy:
                 print ('Centering wrt galaxy...')
-                gal_centre = Get_Galaxy_Centre(params, snap_num)    
-                proj = Get_Galaxy_Proj_Matrix(params, snap_num)
+                gal_centre = get_galaxy_centre(params, snap_num)    
+                proj = get_galaxy_proj_matrix(params, snap_num)
                 gal_centre_proj = np.matmul(proj, gal_centre)
                 proj_gas_coords = proj_gas_coords - gal_centre_proj
 
@@ -277,8 +277,8 @@ def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_b
                 star_coords = snap_data['star_coords']
                 star_masses = snap_data['star_masses']
             else:
-                star_coords = Load_FIRE_Data_Arr('star', 'coords', snap_num, params)
-                star_masses = Load_FIRE_Data_Arr('star', 'masses', snap_num, params)
+                star_coords = load_fire_data_arr('star', 'coords', snap_num, params)
+                star_masses = load_fire_data_arr('star', 'masses', snap_num, params)
             
             dists = np.sqrt((star_coords[:,0]-cloud_centre[0])**2+\
                             (star_coords[:,1]-cloud_centre[1])**2+\
@@ -306,15 +306,15 @@ def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_b
             pIDs = snap_data['pIDs']
         else:
             # Load the snapshot data
-            dens = Load_FIRE_Data_Arr('gas', 'dens', snap_num, params)
-            coords = Load_FIRE_Data_Arr('gas', 'coords', snap_num, params)
-            masses = Load_FIRE_Data_Arr('gas', 'masses', snap_num, params)
-            temps = Load_FIRE_Data_Arr('gas', 'temps', snap_num, params)
-            vels = Load_FIRE_Data_Arr('gas', 'vels', snap_num, params)
-            hsml = Load_FIRE_Data_Arr('gas', 'hsml', snap_num, params)
-            int_energy = Load_FIRE_Data('InternalEnergy', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
-            metal = Load_FIRE_Data('Metallicity', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
-            n_elec = Load_FIRE_Data('ElectronAbundance', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            dens = load_fire_data_arr('gas', 'dens', snap_num, params)
+            coords = load_fire_data_arr('gas', 'coords', snap_num, params)
+            masses = load_fire_data_arr('gas', 'masses', snap_num, params)
+            temps = load_fire_data_arr('gas', 'temps', snap_num, params)
+            vels = load_fire_data_arr('gas', 'vels', snap_num, params)
+            hsml = load_fire_data_arr('gas', 'hsml', snap_num, params)
+            int_energy = load_fire_data('InternalEnergy', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            metal = load_fire_data('Metallicity', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            n_elec = load_fire_data('ElectronAbundance', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
             f_neutral = np.zeros(0)
             f_molec = np.zeros(0)
             z_tot = metal[:, 0]
@@ -361,11 +361,11 @@ def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_b
                 star_pIDs = snap_data['star_pIDs']
                 sfts = snap_data['sfts']
             else:
-                star_coords = Load_FIRE_Data_Arr('star', 'coords', snap_num, params)
-                star_masses = Load_FIRE_Data_Arr('star', 'masses', snap_num, params)
-                star_vels = Load_FIRE_Data('Velocities', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
-                star_pIDs = Load_FIRE_Data('ParticleIDs', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
-                sfts = Load_FIRE_Data('StellarFormationTime', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+                star_coords = load_fire_data_arr('star', 'coords', snap_num, params)
+                star_masses = load_fire_data_arr('star', 'masses', snap_num, params)
+                star_vels = load_fire_data('Velocities', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+                star_pIDs = load_fire_data('ParticleIDs', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+                sfts = load_fire_data('StellarFormationTime', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
 
             inds_x = np.where((star_coords[:,0]>cloud_box['x_min'])&(star_coords[:,0]<cloud_box['x_max']))[0]
             inds_y = np.where((star_coords[:,1]>cloud_box['y_min'])&(star_coords[:,1]<cloud_box['y_max']))[0]
@@ -496,14 +496,14 @@ def read_cloud_summary_data(path, snapnum, nmin, vir, params, r_gal, h, MW_cut=F
             continue
         
         
-        gal_centre = Get_Galaxy_Centre(params, snapnum)
+        gal_centre = get_galaxy_centre(params, snapnum)
         dist = np.sqrt((cloud_centre_x-gal_centre[0])**2+(cloud_centre_y-gal_centre[1])**2+\
                       (cloud_centre_z-gal_centre[2])**2)
         
         cloud_centre = np.array([cloud_centre_x, cloud_centre_y, cloud_centre_z])
         
         ## z-distance from galactic center
-        proj = Get_Galaxy_Proj_Matrix(params, snapnum)
+        proj = get_galaxy_proj_matrix(params, snapnum)
         cloud_centre_proj = np.matmul(proj, cloud_centre)
         gal_centre_proj = np.matmul(proj, gal_centre)
 
