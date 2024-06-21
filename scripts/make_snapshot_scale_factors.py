@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-snapshot_timing: "Find the scale factor at which snapshots need to be produced"
+make_snapshot_scale_factors: "Find the scale factors at which snapshots need to be produced"
 
-Usage: snapshot_timing.py [options]
+Usage: make_snapshot_scale_factors.py [options]
 
 Options:
     -h, --help                  Show this screen
