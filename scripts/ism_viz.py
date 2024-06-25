@@ -21,10 +21,8 @@ Options:
 
 
 from docopt import docopt
-import sys
-sys.path.insert(0, '../src/')
-from fire_utils import *
-from gal_quants_funcs import *
+from galaxy_utils.gal_utils import *
+from generic_utils.fire_utils import *
 import yt
 import h5py
 from meshoid import Meshoid
