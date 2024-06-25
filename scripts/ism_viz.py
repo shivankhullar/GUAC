@@ -5,18 +5,22 @@ ism_viz: "Visualize patch of a galaxy"
 Usage: ism_viz.py [options]
 
 Options:
-    -h, --help                  Show this screen
-    --path=<path>               Path to the simulation directory [default: ./]
-    --sim=<sim>                 Simulation name [default: m12i_final_fb_7k]
-    --snapdir=<snapdir>         Are snapshots in a snapdir directory? [default: True]
-    --snapnum=<snapnum>         Snapshot number [default: 600]
-    --r_gal=<r_gal>             Galaxy radius [default: 25]
-    --h=<h>                     Scale height [default: 0.4] 
-    --save_path=<save_path>     Path to save the images [default: ./]
-    --dist=<dist>               Distance from the center [default: 3]
-    --box_size=<box_size>       Size of the image box [default: 7]
-    --age_cut=<age_cut>         Age cut [default: 3]
-    --res=<res>                 Resolution of the image [default: 2048]
+    -h, --help                                                  Show this screen
+    --path=<path>                                               Path to the simulation directory [default: ./]
+    --sim=<sim>                                                 Simulation name [default: m12i_final_fb_7k]
+    --snapdir=<snapdir>                                         Are snapshots in a snapdir directory? [default: True]
+    --snapnum=<snapnum>                                         Snapshot number [default: 600]
+    --all_snaps_in_dir=<all_snaps_in_dir>                       Are all snapshots in the same directory? [default: False]
+    --r_gal=<r_gal>                                             Galaxy radius [default: 25]
+    --h=<h>                                                     Scale height [default: 0.4] 
+    --save_path=<save_path>                                     Path to save the images [default: ./]
+    --dist=<dist>                                               Distance from the center [default: 3]
+    --special_position=<special_position>                       Box around a special position? [default: 0,0,0]
+    --special_position_refine=<special_position_refine>         Box around the refinement particle? [default: True]
+    --box_size=<box_size>                                       Size of the image box [default: 7]
+    --age_cut=<age_cut>                                         Age cut [default: 3]
+    --stars=<stars>                                             Include stars? [default: False]
+    --res=<res>                                                 Resolution of the image [default: 2048]
 """
 
 
@@ -66,99 +70,16 @@ def get_stellar_ages(sft, params, snapnum, snapdir=None):
 
 
 
-if __name__ == '__main__':
-    args = docopt(__doc__)
-    path = args['--path']
-    snapdir = args['--snapdir']
-    snapnum = int(args['--snapnum'])
-    r_gal = float(args['--r_gal'])
-    h = float(args['--h'])
-    save_path = path+args['--save_path']
-    age_cut = float(args['--age_cut'])
-    res = int(args['--res'])
-    dist = float(args['--dist'])
-    box_size = float(args['--box_size'])
-    sim = args['--sim']
-
-    ## Some bookkeeping
-    start_snap = 591    #Dummy if considering only one snapshot
-    last_snap = 614     #Dummy if considering only one snapshot
-    filename_prefix = "Linked_Clouds_"
-    cloud_num_digits = 4
-    snapshot_num_digits = 4
-    cloud_prefix = "Cloud"
-    
-    gas_data_sub_dir = "GasData/"
-    star_data_sub_dir = "StarData/"
-    image_path = "img_data/"
-    image_filename_prefix = 'center_proj_'
-    image_filename_suffix = '.hdf5'
-    hdf5_file_prefix = 'Clouds_'
-    #age_cut = 1
-    dat_file_header_size=8
-    snapshot_prefix="Snap"
-    cph_sub_dir="CloudPhinderData/"
-    frac_thresh='thresh0.0'
-    nmin = 10
-    vir = 5
-    sub_dir = "CloudTrackerData/n{nmin}_alpha{vir}/".format(nmin=nmin, vir=vir)
-
-
-    params = Params(path, nmin, vir, sub_dir, start_snap, last_snap, filename_prefix, cloud_num_digits, \
-                    snapshot_num_digits, cloud_prefix, snapshot_prefix, age_cut, \
-                    dat_file_header_size, star_data_sub_dir, cph_sub_dir,\
-                    image_path, image_filename_prefix,\
-                    image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim)
-        
-
-    # Start loading data below
-    if snapdir == "True":
-        snapdir = params.path+"snapdir_{num}/".format(num=snapnum)
-    else:
-        snapdir = params.path
-
-    print ("Loading data from snapshot {num}...".format(num=snapnum))
-    
-    positions0 = load_from_snapshot.load_from_snapshot("Coordinates", 0, snapdir, snapnum)
-    masses0 = load_from_snapshot.load_from_snapshot("Masses", 0, snapdir, snapnum)
-    hsml0 = load_from_snapshot.load_from_snapshot("SmoothingLength", 0, snapdir, snapnum)
-    print ("Loaded gas data...")
-
-    positions4 = load_from_snapshot.load_from_snapshot("Coordinates", 4, snapdir, snapnum)
-    masses4 = load_from_snapshot.load_from_snapshot("Masses", 4, snapdir, snapnum)
-    sft4 = load_from_snapshot.load_from_snapshot("StellarFormationTime", 4, snapdir, snapnum)
-    print ("Loaded stellar data...")
-
-    sfts, ages = get_stellar_ages(sft4, params, snapnum, snapdir)
-
-    gal_quants0 = GalQuants(params, snapnum, r_gal, h)
-    gal_quants0.project(positions0)
-    gal_quants0.add_key("Masses", masses0, 1)
-    #gal_quants0.add_key("Velocities", velocities0, 3)
-    gal_quants0.add_key("SmoothingLength", hsml0, 1)
-
-    gal_quants4 = GalQuants(params, snapnum, r_gal, h)
-    gal_quants4.project(positions4)
-    gal_quants4.add_key("Masses", masses4, 1)
-    gal_quants4.add_key("StellarFormationTime", sfts, 1)
-    gal_quants4.add_key("Ages", ages, 1)
-
-
-
-
-
-    pos = gal_quants0.data["Coordinates"]
-    #center = np.median(pos,axis=0)
-    #pos -= center
-    #radius_cut = np.sum(pos*pos,axis=1) < 40*40
-    pos, mass, hsml = pos, gal_quants0.data["Masses"], \
+def make_plot(gal_quants0, center, image_box_size, res, save_path, dist, age_cut, gal_quants4=False, special_position=False):
+    pos, mass, hsml = gal_quants0.data["Coordinates"], gal_quants0.data["Masses"], \
                             gal_quants0.data["SmoothingLength"]#, gal_quants0.data["Velocities"]
 
-    image_box_size = box_size #pdata['BoxSize']
+    
     center = gal_quants0.gal_centre_proj #np.array([box_size/2, box_size/2, box_size/2])
     
     #dist = 3
-    center = center + np.array([dist,dist,0])
+    #center = center + np.array([dist,dist,0])
+    center = center + np.array([x_dist,y_dist,z_dist])
     M = Meshoid(pos, mass, hsml)
 
     min_pos = center-image_box_size/2
@@ -204,19 +125,31 @@ if __name__ == '__main__':
     fov = 35
 
     fontprops = fm.FontProperties(size=18)
-    #scalebar = AnchoredSizeBar(ax.transData,
-    #                        5*pixels/fov, '5 kpc', 'upper left', 
-    #                        pad=1,
-    #                        color='white',
-    #                        frameon=False,
-    #                        size_vertical=5,
-    #                        fontproperties=fontprops)
+    
+    # Create scalebar according to image_box_size
+    # Currently finding the nearest multiple of 100 for box sizes < 4 kpc
+    # and nearest multiple of 1 for box sizes > 4 kpc
+    fraction_of_box_in_scalebar = 0.25
+    scale = 1/fraction_of_box_in_scalebar
+    if image_box_size>=4:
+        scale_bar_length = image_box_size//4
+        scale_bar_string = str(scale_bar_length)+'kpc'
+    elif image_box_size<4 and image_box_size>0.4:
+        scale_bar_length = image_box_size/4*1000//100
+        scale_bar_string = str(scale_bar_length)+'pc'
+    elif image_box_size<0.4 and image_box_size>0.04:
+        scale_bar_length = image_box_size/4*1000//10
+        scale_bar_string = str(scale_bar_length)+'pc'
+    else:
+        scale_bar_length = image_box_size/4*1000
+        scale_bar_string = str(scale_bar_length)+'pc'
+
     scalebar = AnchoredSizeBar(ax.transData,
-                            1, '1 kpc', 'upper left', 
+                            scale_bar_length, scale_bar_string, 'upper left', 
                             pad=1,
                             color='white',
                             frameon=False,
-                            size_vertical=0.1,
+                            size_vertical=scale_bar_length/10,
                             fontproperties=fontprops)
 
     ax.add_artist(scalebar)
@@ -233,7 +166,106 @@ if __name__ == '__main__':
     ax.set_xticks([])
     ax.set_yticks([])
     plt.tight_layout()
-    plt.savefig(save_path+'ism_patch_{dist}_{size}_{age_cut}_{snapnum}.jpg'.format(snapnum=snapnum, dist=int(dist), size=int(image_box_size), age_cut=age_cut), dpi=200)
+    if special_position:
+        if gal_quants4:
+            save_filename = save_path+'ism_patch_{dist}_{size}_{age_cut}_{snapnum}.jpg'.format(snapnum=snapnum, dist=int(dist), size=int(image_box_size), age_cut=age_cut)
+        else:
+            save_filename = save_path+'ism_patch_customloc_{size}_{snapnum}.jpg'.format(snapnum=snapnum, dist=int(dist), size=int(image_box_size), age_cut=age_cut)
+    else:
+        if gal_quants4:
+            save_filename = save_path+'ism_patch_{dist}_{size}_{age_cut}_{snapnum}.jpg'.format(snapnum=snapnum, dist=int(dist), size=int(image_box_size), age_cut=age_cut)
+        else:
+            save_filename = save_path+'ism_patch_{dist}_{size}_{snapnum}.jpg'.format(snapnum=snapnum, dist=int(dist), size=int(image_box_size), age_cut=age_cut)
+    
+    plt.savefig(save_filename, dpi=200)
     plt.close()
 
-    print ("ISM patch saved at {path}".format(path=save_path+"ism_patch_{dist}_{size}_{age_cut}_{snapnum}.jpg".format(snapnum=snapnum, dist=int(dist), size=int(image_box_size), age_cut=age_cut)))
+    print (f"ISM patch saved at {save_filename}")
+
+
+
+
+
+
+if __name__ == '__main__':
+    args = docopt(__doc__)
+    path = args['--path']
+    snapdir = args['--snapdir']
+    snapnum = int(args['--snapnum'])
+    r_gal = float(args['--r_gal'])
+    h = float(args['--h'])
+    save_path = path+args['--save_path']
+    age_cut = float(args['--age_cut'])
+    res = int(args['--res'])
+    dist = float(args['--dist'])
+    box_size = float(args['--box_size'])
+    sim = args['--sim']
+    stars = args['--stars']
+    all_snaps_in_dir = args['--all_snaps_in_dir']
+
+    ## Some bookkeeping
+    start_snap = 591    #Dummy if considering only one snapshot
+    last_snap = 614     #Dummy if considering only one snapshot
+    filename_prefix = "Linked_Clouds_"
+    cloud_num_digits = 4
+    snapshot_num_digits = 4
+    cloud_prefix = "Cloud"
+    
+    gas_data_sub_dir = "GasData/"
+    star_data_sub_dir = "StarData/"
+    image_path = "img_data/"
+    image_filename_prefix = 'center_proj_'
+    image_filename_suffix = '.hdf5'
+    hdf5_file_prefix = 'Clouds_'
+    #age_cut = 1
+    dat_file_header_size=8
+    snapshot_prefix="Snap"
+    cph_sub_dir="CloudPhinderData/"
+    frac_thresh='thresh0.0'
+    nmin = 10
+    vir = 5
+    sub_dir = "CloudTrackerData/n{nmin}_alpha{vir}/".format(nmin=nmin, vir=vir)
+
+
+    params = Params(path, nmin, vir, sub_dir, start_snap, last_snap, filename_prefix, cloud_num_digits, \
+                    snapshot_num_digits, cloud_prefix, snapshot_prefix, age_cut, \
+                    dat_file_header_size, star_data_sub_dir, cph_sub_dir,\
+                    image_path, image_filename_prefix,\
+                    image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim)
+        
+
+    # Start loading data below
+    if snapdir == "True":
+        snapdir = params.path+"snapdir_{num}/".format(num=snapnum)
+    else:
+        snapdir = params.path
+
+    print ("Loading data from snapshot {num}...".format(num=snapnum))
+    
+    positions0 = load_from_snapshot.load_from_snapshot("Coordinates", 0, snapdir, snapnum)
+    masses0 = load_from_snapshot.load_from_snapshot("Masses", 0, snapdir, snapnum)
+    hsml0 = load_from_snapshot.load_from_snapshot("SmoothingLength", 0, snapdir, snapnum)
+    print ("Loaded gas data...")
+    
+    gal_quants0 = GalQuants(params, snapnum, r_gal, h)
+    gal_quants0.project(positions0)
+    gal_quants0.add_key("Masses", masses0, 1)
+    #gal_quants0.add_key("Velocities", velocities0, 3)
+    gal_quants0.add_key("SmoothingLength", hsml0, 1)
+    
+    if stars=="True":
+        positions4 = load_from_snapshot.load_from_snapshot("Coordinates", 4, snapdir, snapnum)
+        masses4 = load_from_snapshot.load_from_snapshot("Masses", 4, snapdir, snapnum)
+        sft4 = load_from_snapshot.load_from_snapshot("StellarFormationTime", 4, snapdir, snapnum)
+        print ("Loaded stellar data...")
+
+        sfts, ages = get_stellar_ages(sft4, params, snapnum, snapdir)    
+        gal_quants4 = GalQuants(params, snapnum, r_gal, h)
+        gal_quants4.project(positions4)
+        gal_quants4.add_key("Masses", masses4, 1)
+        gal_quants4.add_key("StellarFormationTime", sfts, 1)
+        gal_quants4.add_key("Ages", ages, 1)
+
+    print ("Making plot...")
+    make_plot(gal_quants0, center, image_box_size, res, save_path, dist, age_cut, gal_quants4=False, special_position=False)
+    print ("Done!")
