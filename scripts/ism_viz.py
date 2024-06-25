@@ -20,7 +20,7 @@ Options:
     --box_size=<box_size>                                       Size of the image box [default: 7]
     --age_cut=<age_cut>                                         Age cut [default: 3]
     --stars=<stars>                                             Include stars? [default: False]
-    --res=<res>                                                 Resolution of the image [default: 2048]
+    --res=<res>                                                 Resolution of the image [default: 1024]
 """
 
 
@@ -267,5 +267,5 @@ if __name__ == '__main__':
     distance_from_center = np.array([])
 
     print ("Making plot...")
-    make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path, dist, age_cut, gal_quants4=False, special_position=False)
+    make_plot(gal_quants0, distance_from_center, box_size, res, save_path, dist, age_cut, gal_quants4=False, special_position=False)
     print ("Done!")
