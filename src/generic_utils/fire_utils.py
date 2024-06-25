@@ -12,7 +12,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import load_from_snapshot
-import constants
+import generic_utils.constants
 
 class Params():
     """
