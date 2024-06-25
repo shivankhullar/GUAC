@@ -15,8 +15,10 @@ Options:
     --h=<h>                                                     Scale height [default: 0.4] 
     --save_path=<save_path>                                     Path to save the images [default: ./]
     --dist=<dist>                                               Distance from the center [default: 3]
-    --special_position=<special_position>                       Box around a special position? [default: 0,0,0]
-    --special_position_refine=<special_position_refine>         Box around the refinement particle? [default: True]
+    --special_position_flag=<special_position_flag>             Box around a special position? See below [default: False]
+    --special_position_custom=<special_custom_position>         Box around a special position? Enter coords manually. [default: 0,0,0]
+    --special_position_refine=<special_position_refine>         Box around the refinement particle? [default: False]
+    --special_position_refine_fix=<special_position_refine_fix> Box around the refinement particle at first snap? [default: False]
     --box_size=<box_size>                                       Size of the image box [default: 7]
     --age_cut=<age_cut>                                         Age cut [default: 3]
     --stars=<stars>                                             Include stars? [default: False]
@@ -71,7 +73,7 @@ def get_stellar_ages(sft, params, snapnum, snapdir=None):
 
 
 
-def make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path, dist, age_cut, gal_quants4=False, special_position=False):
+def make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path, dist, age_cut, gal_quants4, refine_pos=None, special_position=False):
     pos, mass, hsml = gal_quants0.data["Coordinates"], gal_quants0.data["Masses"], \
                             gal_quants0.data["SmoothingLength"]#, gal_quants0.data["Velocities"]
 
@@ -155,11 +157,14 @@ def make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path,
     #plt.scatter(cloud_centres[cloud_num, 0], cloud_centres[cloud_num, 1], s=cloud_reffs[cloud_num]*1500, c='r', alpha=0.5)
 
     #ax.scatter(star_coords[:,0]+gal_quants4.gal_centre_proj[0], star_coords[:,1]+gal_quants4.gal_centre_proj[1], s=10, c='b', alpha=0.5)
-    #age_cut = 3
-    ax.scatter(gal_quants4.data["Coordinates"][:,0][gal_quants4.data["Ages"]<age_cut], gal_quants4.data["Coordinates"][:,1][gal_quants4.data["Ages"]<age_cut], s=10, \
-            c=gal_quants4.data["Ages"][gal_quants4.data["Ages"]<age_cut], cmap = cm.get_cmap('Blues_r'), alpha=1)
-    ax.scatter(gal_quants4.data["Coordinates"][:,0][::300], gal_quants4.data["Coordinates"][:,1][::300], s=0.5, c='w')
-    #ax.scatter(-32040, 10600, s=10, c='g', alpha=1)
+    #age_cut = 3 
+    if gal_quants4 is not None:
+        ax.scatter(gal_quants4.data["Coordinates"][:,0][gal_quants4.data["Ages"]<age_cut], gal_quants4.data["Coordinates"][:,1][gal_quants4.data["Ages"]<age_cut], s=10, \
+                c=gal_quants4.data["Ages"][gal_quants4.data["Ages"]<age_cut], cmap = cm.get_cmap('Blues_r'), alpha=1)
+        #ax.scatter(gal_quants4.data["Coordinates"][:,0][::300], gal_quants4.data["Coordinates"][:,1][::300], s=0.5, c='w')
+    if refine_pos is not None:
+        ax.scatter(refine_pos[0], refine_pos[1], s=10, c='g')
+
     ax.set_xticks([])
     ax.set_yticks([])
     plt.tight_layout()
@@ -181,7 +186,49 @@ def make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path,
 
 
 
+def get_galquants_data(params, snapnum, snapdir, stars, special_refine_pos):
+    # Start loading data below
+    if snapdir == "True":
+        snapdir = params.path+"snapdir_{num}/".format(num=snapnum)
+    else:
+        snapdir = params.path
 
+    positions0 = load_from_snapshot.load_from_snapshot("Coordinates", 0, snapdir, snapnum)
+    masses0 = load_from_snapshot.load_from_snapshot("Masses", 0, snapdir, snapnum)
+    hsml0 = load_from_snapshot.load_from_snapshot("SmoothingLength", 0, snapdir, snapnum)
+    print ("Loaded gas data...")
+    
+    gal_quants0 = GalQuants(params, snapnum, r_gal, h)
+    gal_quants0.project(positions0)
+    gal_quants0.add_key("Masses", masses0, 1)
+    #gal_quants0.add_key("Velocities", velocities0, 3)
+    gal_quants0.add_key("SmoothingLength", hsml0, 1)
+    
+    gal_quants3, gal_quants4 = None, None
+    if stars=="True":
+        positions4 = load_from_snapshot.load_from_snapshot("Coordinates", 4, snapdir, snapnum)
+        masses4 = load_from_snapshot.load_from_snapshot("Masses", 4, snapdir, snapnum)
+        sft4 = load_from_snapshot.load_from_snapshot("StellarFormationTime", 4, snapdir, snapnum)
+        print ("Loaded stellar data...")
+
+        sfts, ages = get_stellar_ages(sft4, params, snapnum, snapdir)    
+        gal_quants4 = GalQuants(params, snapnum, r_gal, h)
+        gal_quants4.project(positions4)
+        gal_quants4.add_key("Masses", masses4, 1)
+        gal_quants4.add_key("StellarFormationTime", sfts, 1)
+        gal_quants4.add_key("Ages", ages, 1)
+
+    if special_refine_pos=="True":
+        positions3 = load_from_snapshot.load_from_snapshot("Coordinates", 3, snapdir, snapnum)
+        masses3 = load_from_snapshot.load_from_snapshot("Masses", 3, snapdir, snapnum)
+        vels3 =  load_from_snapshot.load_from_snapshot("Velocities", 3, snapdir, snapnum)
+
+        gal_quants3 = GalQuants(params, snapnum, r_gal, h)
+        gal_quants3.project(positions3)
+        gal_quants3.add_key("Masses", masses3, 1)
+        gal_quants3.add_key("Velocities", vels3, 3)
+    
+    return gal_quants0, gal_quants3, gal_quants4
 
 
 if __name__ == '__main__':
@@ -197,8 +244,12 @@ if __name__ == '__main__':
     dist = float(args['--dist'])
     box_size = float(args['--box_size'])
     sim = args['--sim']
-    stars = args['--stars']
-    all_snaps_in_dir = args['--all_snaps_in_dir']
+    stars = convert_to_bool(args['--stars'])
+    all_snaps_in_dir = convert_to_bool(args['--all_snaps_in_dir'])
+    special_pos_flag = convert_to_bool(args['--special_position_flag'])
+    special_custom_pos = convert_to_array(args['--special_position_custom'], np.float64)
+    special_refine_pos = convert_to_bool(args['--special_position_refine'])
+    special_refine_pos_fix = convert_to_bool(args['--special_position_refine_fix'])
 
     ## Some bookkeeping
     start_snap = 591    #Dummy if considering only one snapshot
@@ -231,41 +282,55 @@ if __name__ == '__main__':
                     image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim)
         
 
-    # Start loading data below
-    if snapdir == "True":
-        snapdir = params.path+"snapdir_{num}/".format(num=snapnum)
-    else:
-        snapdir = params.path
+    
 
     print ("Loading data from snapshot {num}...".format(num=snapnum))
     
-    positions0 = load_from_snapshot.load_from_snapshot("Coordinates", 0, snapdir, snapnum)
-    masses0 = load_from_snapshot.load_from_snapshot("Masses", 0, snapdir, snapnum)
-    hsml0 = load_from_snapshot.load_from_snapshot("SmoothingLength", 0, snapdir, snapnum)
-    print ("Loaded gas data...")
+    gal_quants0, gal_quants3, gal_quants4 = get_galquants_data(params, snapnum, snapdir, stars, special_refine_pos)
+
     
-    gal_quants0 = GalQuants(params, snapnum, r_gal, h)
-    gal_quants0.project(positions0)
-    gal_quants0.add_key("Masses", masses0, 1)
-    #gal_quants0.add_key("Velocities", velocities0, 3)
-    gal_quants0.add_key("SmoothingLength", hsml0, 1)
-    
-    if stars=="True":
-        positions4 = load_from_snapshot.load_from_snapshot("Coordinates", 4, snapdir, snapnum)
-        masses4 = load_from_snapshot.load_from_snapshot("Masses", 4, snapdir, snapnum)
-        sft4 = load_from_snapshot.load_from_snapshot("StellarFormationTime", 4, snapdir, snapnum)
-        print ("Loaded stellar data...")
 
-        sfts, ages = get_stellar_ages(sft4, params, snapnum, snapdir)    
-        gal_quants4 = GalQuants(params, snapnum, r_gal, h)
-        gal_quants4.project(positions4)
-        gal_quants4.add_key("Masses", masses4, 1)
-        gal_quants4.add_key("StellarFormationTime", sfts, 1)
-        gal_quants4.add_key("Ages", ages, 1)
+    if all_snaps_in_dir:
+        # Get the list of snapshots in the directory, try a bunch of ways
+        snap_list = np.sort(glob.glob(snapdir+'snapshot*.hdf5'))
+        if snap_list.size>0:
+            snap_num_list = np.array([int(snap.split('snapshot_')[1].split('.hdf5')[0]) for snap in snap_list])
+        if snap_list.size==0:
+            snap_list = np.sort(glob.glob(snapdir+'snapdir*/snapshot*.0.hdf5'))
+            if snap_list.size>0:
+                snap_num_list = np.array([int(snap.split('snapshot_')[1].split('.0.hdf5')[0]) for snap in snap_list])
+        if snap_list.size==0:
+            snap_list = np.sort(glob.glob(snapdir+'snapdir_*/*.hdf5'))
+            if snap_list.size>0:
+                snap_num_list = np.array([int(snap.split('snapshot_')[1].split('.hdf5')[0]) for snap in snap_list])
+        if snap_list.size==0:
+            print ('No snapshots found in the given directory.')
+            # Exit if no snapshots found
+            exit()
+        
+        print ("List of snapnums:", snap_num_list)
 
+        for snapnum in snap_num_list:
+            refine_pos_proj = gal_quants3.data["Coordinates"][0] 
+            if special_refine_pos_fix:
+                # Use the original refinement particle as the special position
+                if snapnum==snap_num_list[0]:
+                    special_position = True
+                    distance_from_center = refine_pos_proj - gal_quants0.gal_centre_proj
+            else:
+                # Use the refinement particle as the special position
+                distance_from_center = refine_pos_proj - gal_quants0.gal_centre_proj
 
-    distance_from_center = np.array([])
+            print ("Making plot...")
+            make_plot(gal_quants0, distance_from_center, box_size, res, save_path, dist, age_cut, gal_quants4, refine_pos_proj)
+            print ("Done!")
 
-    print ("Making plot...")
-    make_plot(gal_quants0, distance_from_center, box_size, res, save_path, dist, age_cut, gal_quants4=False, special_position=False)
-    print ("Done!")
+    else:
+        # Focus on a special position in the galaxy
+        
+        proj_special_pos = np.matmul(gal_quants0.proj_matrix, special_custom_pos)
+        distance_from_center = proj_special_pos - gal_quants0.gal_centre_proj
+
+        print ("Making plot...")
+        make_plot(gal_quants0, distance_from_center, box_size, res, save_path, dist, age_cut, gal_quants4, special_position=False)
+        print ("Done!")
