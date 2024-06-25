@@ -27,6 +27,7 @@ Options:
 from docopt import docopt
 from galaxy_utils.gal_utils import *
 from generic_utils.fire_utils import *
+from generic_utils.script_utils import *
 import yt
 import h5py
 from meshoid import Meshoid
@@ -70,7 +71,7 @@ def get_stellar_ages(sft, params, snapnum, snapdir=None):
 
 
 
-def make_plot(gal_quants0, center, image_box_size, res, save_path, dist, age_cut, gal_quants4=False, special_position=False):
+def make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path, dist, age_cut, gal_quants4=False, special_position=False):
     pos, mass, hsml = gal_quants0.data["Coordinates"], gal_quants0.data["Masses"], \
                             gal_quants0.data["SmoothingLength"]#, gal_quants0.data["Velocities"]
 
@@ -79,7 +80,7 @@ def make_plot(gal_quants0, center, image_box_size, res, save_path, dist, age_cut
     
     #dist = 3
     #center = center + np.array([dist,dist,0])
-    center = center + np.array([x_dist,y_dist,z_dist])
+    center = center + distance_from_center   #np.array([x_dist,y_dist,z_dist])
     M = Meshoid(pos, mass, hsml)
 
     min_pos = center-image_box_size/2
@@ -120,10 +121,6 @@ def make_plot(gal_quants0, center, image_box_size, res, save_path, dist, age_cut
     ax.set_xlim([min_pos[0], max_pos[0]])
     ax.set_ylim([min_pos[1], max_pos[1]])
 
-
-    pixels = res
-    fov = 35
-
     fontprops = fm.FontProperties(size=18)
     
     # Create scalebar according to image_box_size
@@ -131,17 +128,17 @@ def make_plot(gal_quants0, center, image_box_size, res, save_path, dist, age_cut
     # and nearest multiple of 1 for box sizes > 4 kpc
     fraction_of_box_in_scalebar = 0.25
     scale = 1/fraction_of_box_in_scalebar
-    if image_box_size>=4:
-        scale_bar_length = image_box_size//4
+    if image_box_size>=scale:
+        scale_bar_length = image_box_size//scale
         scale_bar_string = str(scale_bar_length)+'kpc'
-    elif image_box_size<4 and image_box_size>0.4:
-        scale_bar_length = image_box_size/4*1000//100
+    elif image_box_size<scale and image_box_size>scale/10:
+        scale_bar_length = image_box_size/scale*1000//100
         scale_bar_string = str(scale_bar_length)+'pc'
-    elif image_box_size<0.4 and image_box_size>0.04:
-        scale_bar_length = image_box_size/4*1000//10
+    elif image_box_size<scale/10 and image_box_size>scale/100:
+        scale_bar_length = image_box_size/scale*1000//10
         scale_bar_string = str(scale_bar_length)+'pc'
     else:
-        scale_bar_length = image_box_size/4*1000
+        scale_bar_length = image_box_size/scale*1000
         scale_bar_string = str(scale_bar_length)+'pc'
 
     scalebar = AnchoredSizeBar(ax.transData,
@@ -266,6 +263,9 @@ if __name__ == '__main__':
         gal_quants4.add_key("StellarFormationTime", sfts, 1)
         gal_quants4.add_key("Ages", ages, 1)
 
+
+    distance_from_center = np.array([])
+
     print ("Making plot...")
-    make_plot(gal_quants0, center, image_box_size, res, save_path, dist, age_cut, gal_quants4=False, special_position=False)
+    make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path, dist, age_cut, gal_quants4=False, special_position=False)
     print ("Done!")
