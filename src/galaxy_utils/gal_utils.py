@@ -56,14 +56,15 @@ class GalQuants():
     def project(self, coords_data):
         if self.gal_centre is None:
             self.gal_centre = get_galaxy_centre(self.params, self.snapnum)
-            print (self.gal_centre)
+            print ('Galactic center:', self.gal_centre)
             #gal_centre = Get_Galaxy_Centre(self.params, self.snapnum)    
         if self.proj is None:
             self.proj = get_galaxy_proj_matrix(self.params, self.snapnum)
-            print (self.proj)
+            #print (self.proj)
 
             #proj = Get_Galaxy_Proj_Matrix(self.params, self.snapnum)
         self.gal_centre_proj = np.matmul(self.proj, self.gal_centre)
+        print ("Projected quantities:")
         print (self.gal_centre_proj, self.gal_centre, self.proj)
         self.spherical_cut(coords_data)
         init_coords_x = np.take(coords_data[:,0], self.sphere_inds)
@@ -80,6 +81,14 @@ class GalQuants():
             #if i%5000==0:
                 #print('Percent complete:', i/len(gas_coords)*100)
         proj_gas_coords = np.array(proj_gas_coords)
+        print (proj_gas_coords, proj_gas_coords.shape)
+
+        #if len(proj_gas_coords)==1:
+            
+        #    gal_dist_proj = np.sqrt((proj_gas_coords[:,0]-self.gal_centre_proj[0])**2+\
+        #                            (proj_gas_coords[:,1]-self.gal_centre_proj[1])**2+\
+        #                            (proj_gas_coords[:,2]-self.gal_centre_proj[2])**2)
+
 
         gal_dist_proj = np.sqrt((proj_gas_coords[:,0]-self.gal_centre_proj[0])**2+\
                             (proj_gas_coords[:,1]-self.gal_centre_proj[1])**2+\
