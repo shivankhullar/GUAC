@@ -220,29 +220,30 @@ def get_galquants_data(params, snapnum, snapdir_bool, stars, special_refine_pos)
         gal_quants4.add_key("Ages", ages, 1)
 
     if special_refine_pos:
-        #positions3 = load_from_snapshot.load_from_snapshot("Coordinates", 3, snapdir, snapnum, units_to_physical=True)
-        #masses3 = load_from_snapshot.load_from_snapshot("Masses", 3, snapdir, snapnum, units_to_physical=True)
-        #vels3 =  load_from_snapshot.load_from_snapshot("Velocities", 3, snapdir, snapnum, units_to_physical=True)
-        if snapnum<10:
-            f = h5py.File(snapdir+"snapshot_00{num}.hdf5".format(num=snapnum), 'r')
-        elif snapnum>=10 and snapnum<100:
-            f = h5py.File(snapdir+"snapshot_0{num}.hdf5".format(num=snapnum), 'r')
-        else:
-            f = h5py.File(snapdir+"snapshot_{num}.hdf5".format(num=snapnum), 'r')
+        positions3 = load_from_snapshot.load_from_snapshot("Coordinates", 3, snapdir, snapnum, units_to_physical=True)
+        masses3 = load_from_snapshot.load_from_snapshot("Masses", 3, snapdir, snapnum, units_to_physical=True)
+        vels3 =  load_from_snapshot.load_from_snapshot("Velocities", 3, snapdir, snapnum, units_to_physical=True)
+        #if snapnum<10:
+        #    f = h5py.File(snapdir+"snapshot_00{num}.hdf5".format(num=snapnum), 'r')
+        #elif snapnum>=10 and snapnum<100:
+        #    f = h5py.File(snapdir+"snapshot_0{num}.hdf5".format(num=snapnum), 'r')
+        #else:
+        #    f = h5py.File(snapdir+"snapshot_{num}.hdf5".format(num=snapnum), 'r')
 
-        hubble = f["Header"].attrs["HubbleParam"]
-        hinv = 1./hubble; ascale=f["Header"].attrs["Time"]
-        rconv = ascale*hinv
-        positions3 = np.array(f["PartType3/Coordinates"][:])
-        positions3 *= rconv
-        masses3 = np.array(f["PartType3/Masses"][:])
-        masses3 *= hinv
-        vels3 = np.array(f["PartType3/Velocities"][:])
-        vels3 *= np.sqrt(ascale)
+        #hubble = f["Header"].attrs["HubbleParam"]
+        #hinv = 1./hubble; ascale=f["Header"].attrs["Time"]
+        #rconv = ascale*hinv
+        #positions3 = np.array(f["PartType3/Coordinates"][:])
+        #positions3 *= rconv
+        #masses3 = np.array(f["PartType3/Masses"][:])
+        #masses3 *= hinv
+        #vels3 = np.array(f["PartType3/Velocities"][:])
+        #vels3 *= np.sqrt(ascale)
 
         print (positions3, masses3, vels3, positions3.shape, positions0.shape)
         gal_quants3 = GalQuants(params, snapnum, r_gal, h)
         gal_quants3.project(positions3)
+        gal_quants3.add_key("Coordinates", positions3, 3)
         gal_quants3.add_key("Masses", masses3, 1)
         gal_quants3.add_key("Velocities", vels3, 3)
     
