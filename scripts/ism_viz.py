@@ -30,6 +30,7 @@ from docopt import docopt
 from galaxy_utils.gal_utils import *
 from generic_utils.fire_utils import *
 from generic_utils.script_utils import *
+import glob
 import yt
 import h5py
 from meshoid import Meshoid
@@ -186,16 +187,16 @@ def make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path,
 
 
 
-def get_galquants_data(params, snapnum, snapdir, stars, special_refine_pos):
+def get_galquants_data(params, snapnum, snapdir_bool, stars, special_refine_pos):
     # Start loading data below
-    if snapdir == "True":
+    if snapdir_bool:
         snapdir = params.path+"snapdir_{num}/".format(num=snapnum)
     else:
         snapdir = params.path
 
-    positions0 = load_from_snapshot.load_from_snapshot("Coordinates", 0, snapdir, snapnum)
-    masses0 = load_from_snapshot.load_from_snapshot("Masses", 0, snapdir, snapnum)
-    hsml0 = load_from_snapshot.load_from_snapshot("SmoothingLength", 0, snapdir, snapnum)
+    positions0 = load_from_snapshot.load_from_snapshot("Coordinates", 0, snapdir, snapnum, units_to_physical=True)
+    masses0 = load_from_snapshot.load_from_snapshot("Masses", 0, snapdir, snapnum, units_to_physical=True)
+    hsml0 = load_from_snapshot.load_from_snapshot("SmoothingLength", 0, snapdir, snapnum, units_to_physical=True)
     print ("Loaded gas data...")
     
     gal_quants0 = GalQuants(params, snapnum, r_gal, h)
@@ -205,10 +206,10 @@ def get_galquants_data(params, snapnum, snapdir, stars, special_refine_pos):
     gal_quants0.add_key("SmoothingLength", hsml0, 1)
     
     gal_quants3, gal_quants4 = None, None
-    if stars=="True":
-        positions4 = load_from_snapshot.load_from_snapshot("Coordinates", 4, snapdir, snapnum)
+    if stars:
+        positions4 = load_from_snapshot.load_from_snapshot("Coordinates", 4, snapdir, snapnum, units_to_physical=True)
         masses4 = load_from_snapshot.load_from_snapshot("Masses", 4, snapdir, snapnum)
-        sft4 = load_from_snapshot.load_from_snapshot("StellarFormationTime", 4, snapdir, snapnum)
+        sft4 = load_from_snapshot.load_from_snapshot("StellarFormationTime", 4, snapdir, snapnum, units_to_physical=True)
         print ("Loaded stellar data...")
 
         sfts, ages = get_stellar_ages(sft4, params, snapnum, snapdir)    
@@ -218,11 +219,28 @@ def get_galquants_data(params, snapnum, snapdir, stars, special_refine_pos):
         gal_quants4.add_key("StellarFormationTime", sfts, 1)
         gal_quants4.add_key("Ages", ages, 1)
 
-    if special_refine_pos=="True":
-        positions3 = load_from_snapshot.load_from_snapshot("Coordinates", 3, snapdir, snapnum)
-        masses3 = load_from_snapshot.load_from_snapshot("Masses", 3, snapdir, snapnum)
-        vels3 =  load_from_snapshot.load_from_snapshot("Velocities", 3, snapdir, snapnum)
+    if special_refine_pos:
+        #positions3 = load_from_snapshot.load_from_snapshot("Coordinates", 3, snapdir, snapnum, units_to_physical=True)
+        #masses3 = load_from_snapshot.load_from_snapshot("Masses", 3, snapdir, snapnum, units_to_physical=True)
+        #vels3 =  load_from_snapshot.load_from_snapshot("Velocities", 3, snapdir, snapnum, units_to_physical=True)
+        if snapnum<10:
+            f = h5py.File(snapdir+"snapshot_00{num}.hdf5".format(num=snapnum), 'r')
+        elif snapnum>=10 and snapnum<100:
+            f = h5py.File(snapdir+"snapshot_0{num}.hdf5".format(num=snapnum), 'r')
+        else:
+            f = h5py.File(snapdir+"snapshot_{num}.hdf5".format(num=snapnum), 'r')
 
+        hubble = f["Header"].attrs["HubbleParam"]
+        hinv = 1./hubble; ascale=f["Header"].attrs["Time"]
+        rconv = ascale*hinv
+        positions3 = np.array(f["PartType3/Coordinates"][:])
+        positions3 *= rconv
+        masses3 = np.array(f["PartType3/Masses"][:])
+        masses3 *= hinv
+        vels3 = np.array(f["PartType3/Velocities"][:])
+        vels3 *= np.sqrt(ascale)
+
+        print (positions3, masses3, vels3, positions3.shape, positions0.shape)
         gal_quants3 = GalQuants(params, snapnum, r_gal, h)
         gal_quants3.project(positions3)
         gal_quants3.add_key("Masses", masses3, 1)
@@ -234,7 +252,7 @@ def get_galquants_data(params, snapnum, snapdir, stars, special_refine_pos):
 if __name__ == '__main__':
     args = docopt(__doc__)
     path = args['--path']
-    snapdir = args['--snapdir']
+    snapdir = convert_to_bool(args['--snapdir'])
     snapnum = int(args['--snapnum'])
     r_gal = float(args['--r_gal'])
     h = float(args['--h'])
@@ -277,30 +295,27 @@ if __name__ == '__main__':
 
     params = Params(path, nmin, vir, sub_dir, start_snap, last_snap, filename_prefix, cloud_num_digits, \
                     snapshot_num_digits, cloud_prefix, snapshot_prefix, age_cut, \
-                    dat_file_header_size, star_data_sub_dir, cph_sub_dir,\
+                    dat_file_header_size, gas_data_sub_dir, star_data_sub_dir, cph_sub_dir,\
                     image_path, image_filename_prefix,\
-                    image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim)
+                    image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim, r_gal=r_gal, h=h)
         
 
     
 
-    print ("Loading data from snapshot {num}...".format(num=snapnum))
     
-    gal_quants0, gal_quants3, gal_quants4 = get_galquants_data(params, snapnum, snapdir, stars, special_refine_pos)
-
     
 
     if all_snaps_in_dir:
         # Get the list of snapshots in the directory, try a bunch of ways
-        snap_list = np.sort(glob.glob(snapdir+'snapshot*.hdf5'))
+        snap_list = np.sort(glob.glob(path+'snapshot*.hdf5'))
         if snap_list.size>0:
             snap_num_list = np.array([int(snap.split('snapshot_')[1].split('.hdf5')[0]) for snap in snap_list])
         if snap_list.size==0:
-            snap_list = np.sort(glob.glob(snapdir+'snapdir*/snapshot*.0.hdf5'))
+            snap_list = np.sort(glob.glob(path+'snapdir*/snapshot*.0.hdf5'))
             if snap_list.size>0:
                 snap_num_list = np.array([int(snap.split('snapshot_')[1].split('.0.hdf5')[0]) for snap in snap_list])
         if snap_list.size==0:
-            snap_list = np.sort(glob.glob(snapdir+'snapdir_*/*.hdf5'))
+            snap_list = np.sort(glob.glob(path+'snapdir_*/*.hdf5'))
             if snap_list.size>0:
                 snap_num_list = np.array([int(snap.split('snapshot_')[1].split('.hdf5')[0]) for snap in snap_list])
         if snap_list.size==0:
@@ -309,9 +324,14 @@ if __name__ == '__main__':
             exit()
         
         print ("List of snapnums:", snap_num_list)
-
+    
+        
         for snapnum in snap_num_list:
-            refine_pos_proj = gal_quants3.data["Coordinates"][0] 
+            print ("Loading data from snapshot {num}...".format(num=snapnum))
+            gal_quants0, gal_quants3, gal_quants4 = get_galquants_data(params, snapnum, snapdir, stars, special_refine_pos)
+
+            refine_pos_proj = gal_quants3.data["Coordinates"]#[0]
+            print (refine_pos_proj) 
             if special_refine_pos_fix:
                 # Use the original refinement particle as the special position
                 if snapnum==snap_num_list[0]:
@@ -326,6 +346,10 @@ if __name__ == '__main__':
             print ("Done!")
 
     else:
+        print ("Loading data from snapshot {num}...".format(num=snapnum))
+    
+        gal_quants0, gal_quants3, gal_quants4 = get_galquants_data(params, snapnum, snapdir, stars, special_refine_pos)
+
         # Focus on a special position in the galaxy
         
         proj_special_pos = np.matmul(gal_quants0.proj_matrix, special_custom_pos)
