@@ -80,15 +80,17 @@ def make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path,
 
     
     center = gal_quants0.gal_centre_proj #np.array([box_size/2, box_size/2, box_size/2])
-    
+    print ("Center 0:", center)
     #dist = 3
     #center = center + np.array([dist,dist,0])
     center = center + distance_from_center   #np.array([x_dist,y_dist,z_dist])
+    print ("Center:", center)
     M = Meshoid(pos, mass, hsml)
 
     min_pos = center-image_box_size/2
     max_pos = center+image_box_size/2
     #box_size = max_pos-min_pos
+    print ("Min, max pos:",min_pos, max_pos)
     X = np.linspace(min_pos[0], max_pos[0], res)
     Y = np.linspace(min_pos[1], max_pos[1], res)
 
@@ -117,6 +119,7 @@ def make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path,
     #cmap = plt.cm.get_cmap('magma')
 
     image = sigma_gas_msun_pc2
+    print ("Min sigma_gas", sigma_gas_msun_pc2.min())
     image[image<1e-3] = 1e-3
 
     p = ax.pcolormesh(X, Y, image, norm=colors.LogNorm(vmin=5e-1,vmax=5e3), cmap=cmap)
@@ -129,6 +132,7 @@ def make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path,
     # Create scalebar according to image_box_size
     # Currently finding the nearest multiple of 100 for box sizes < 4 kpc
     # and nearest multiple of 1 for box sizes > 4 kpc
+    """
     fraction_of_box_in_scalebar = 0.25
     scale = 1/fraction_of_box_in_scalebar
     if image_box_size>=scale:
@@ -153,7 +157,7 @@ def make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path,
                             fontproperties=fontprops)
 
     ax.add_artist(scalebar)
-
+    """
     #plt.scatter(cloud_centres[:,0], cloud_centres[:,1], s=cloud_reffs*1000, c='b', alpha=0.5)
     #plt.scatter(cloud_centres[cloud_num, 0], cloud_centres[cloud_num, 1], s=cloud_reffs[cloud_num]*1500, c='r', alpha=0.5)
 
@@ -204,6 +208,8 @@ def get_galquants_data(params, snapnum, snapdir_bool, stars, special_refine_pos)
     gal_quants0.add_key("Masses", masses0, 1)
     #gal_quants0.add_key("Velocities", velocities0, 3)
     gal_quants0.add_key("SmoothingLength", hsml0, 1)
+
+    print ("In get_galquants_data: ", gal_quants0.gal_centre_proj, gal_quants0.gal_centre)
     
     gal_quants3, gal_quants4 = None, None
     if stars:
@@ -223,6 +229,7 @@ def get_galquants_data(params, snapnum, snapdir_bool, stars, special_refine_pos)
         positions3 = load_from_snapshot.load_from_snapshot("Coordinates", 3, snapdir, snapnum, units_to_physical=True)
         masses3 = load_from_snapshot.load_from_snapshot("Masses", 3, snapdir, snapnum, units_to_physical=True)
         vels3 =  load_from_snapshot.load_from_snapshot("Velocities", 3, snapdir, snapnum, units_to_physical=True)
+        print ("Loaded refinement data...")
         #if snapnum<10:
         #    f = h5py.File(snapdir+"snapshot_00{num}.hdf5".format(num=snapnum), 'r')
         #elif snapnum>=10 and snapnum<100:
@@ -243,7 +250,6 @@ def get_galquants_data(params, snapnum, snapdir_bool, stars, special_refine_pos)
         print (positions3, masses3, vels3, positions3.shape, positions0.shape)
         gal_quants3 = GalQuants(params, snapnum, r_gal, h)
         gal_quants3.project(positions3)
-        gal_quants3.add_key("Coordinates", positions3, 3)
         gal_quants3.add_key("Masses", masses3, 1)
         gal_quants3.add_key("Velocities", vels3, 3)
     
@@ -328,24 +334,29 @@ if __name__ == '__main__':
     
         
         for snapnum in snap_num_list:
+            print ("================================================================")
             print ("Loading data from snapshot {num}...".format(num=snapnum))
             gal_quants0, gal_quants3, gal_quants4 = get_galquants_data(params, snapnum, snapdir, stars, special_refine_pos)
 
-            refine_pos_proj = gal_quants3.data["Coordinates"]#[0]
-            print (refine_pos_proj) 
+            refine_pos_proj = gal_quants3.data["Coordinates"][0]
+            print ("Projected refinement position:", refine_pos_proj, gal_quants3.gal_centre_proj, gal_quants0.gal_centre_proj) 
             if special_refine_pos_fix:
+                print ("Special refinement position flag is set to True")
                 # Use the original refinement particle as the special position
                 if snapnum==snap_num_list[0]:
+                    print ("First snapshot")
                     special_position = True
                     distance_from_center = refine_pos_proj - gal_quants0.gal_centre_proj
             else:
                 # Use the refinement particle as the special position
                 distance_from_center = refine_pos_proj - gal_quants0.gal_centre_proj
 
+            print ("Distance from center:", distance_from_center)
             print ("Making plot...")
             make_plot(gal_quants0, distance_from_center, box_size, res, save_path, dist, age_cut, gal_quants4, refine_pos_proj)
             print ("Done!")
-
+            print ("================================================================")
+            
     else:
         print ("Loading data from snapshot {num}...".format(num=snapnum))
     

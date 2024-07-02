@@ -56,7 +56,7 @@ class GalQuants():
     def project(self, coords_data):
         if self.gal_centre is None:
             self.gal_centre = get_galaxy_centre(self.params, self.snapnum)
-            print ('Galactic center:', self.gal_centre)
+            #print ('Galactic center:', self.gal_centre)
             #gal_centre = Get_Galaxy_Centre(self.params, self.snapnum)    
         if self.proj is None:
             self.proj = get_galaxy_proj_matrix(self.params, self.snapnum)
@@ -100,10 +100,18 @@ class GalQuants():
                             #np.take(np.abs(proj_gas_coords[:,2]-gal_centre_proj[2]), \
                             #           np.where(gal_dist_proj<=self.r_gal)[0])
         
+        #print ("Projected z_dists:", proj_gas_z_dist[0], gal_dist_proj[0], len(proj_gas_z_dist))
+        #if len(proj_gas_z_dist)==1 and proj_gas_z_dist[0]<=self.h and gal_dist_proj[0]<=self.r_gal:
+        #    print ("Single particle case...", proj_gas_coords)
+        #    self.data["Coordinates"] = proj_gas_coords
+        #    self.data["GalDist"] = gal_dist_proj
+        #else:
         self.disk_inds = np.where((gal_dist_proj<=self.r_gal)&(proj_gas_z_dist<=self.h))[0]
+        #print ("Disk indices:", self.disk_inds)
         proj_gas_coords_x = np.take(proj_gas_coords[:,0], self.disk_inds)
         proj_gas_coords_y = np.take(proj_gas_coords[:,1], self.disk_inds)
         proj_gas_coords_z = np.take(proj_gas_coords[:,2], self.disk_inds)
+
         self.data["Coordinates"] = np.array([proj_gas_coords_x,proj_gas_coords_y,proj_gas_coords_z]).T
         self.data["GalDist"] = np.take(gal_dist_proj, self.disk_inds)
 
