@@ -56,7 +56,7 @@ class GalQuants():
     def project(self, coords_data):
         if self.gal_centre is None:
             self.gal_centre = get_galaxy_centre(self.params, self.snapnum)
-            print ('Galactic center:', self.gal_centre)
+            #print ('Galactic center:', self.gal_centre)
             #gal_centre = Get_Galaxy_Centre(self.params, self.snapnum)    
         if self.proj is None:
             self.proj = get_galaxy_proj_matrix(self.params, self.snapnum)
