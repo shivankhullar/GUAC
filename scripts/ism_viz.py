@@ -84,6 +84,7 @@ def make_plot(gal_quants0, distance_from_center, image_box_size, res, save_path,
     #dist = 3
     #center = center + np.array([dist,dist,0])
     center = center + distance_from_center   #np.array([x_dist,y_dist,z_dist])
+    print ("Center:", center)
     M = Meshoid(pos, mass, hsml)
 
     min_pos = center-image_box_size/2
@@ -223,6 +224,7 @@ def get_galquants_data(params, snapnum, snapdir_bool, stars, special_refine_pos)
         positions3 = load_from_snapshot.load_from_snapshot("Coordinates", 3, snapdir, snapnum, units_to_physical=True)
         masses3 = load_from_snapshot.load_from_snapshot("Masses", 3, snapdir, snapnum, units_to_physical=True)
         vels3 =  load_from_snapshot.load_from_snapshot("Velocities", 3, snapdir, snapnum, units_to_physical=True)
+        print ("Loaded refinement data...")
         #if snapnum<10:
         #    f = h5py.File(snapdir+"snapshot_00{num}.hdf5".format(num=snapnum), 'r')
         #elif snapnum>=10 and snapnum<100:
@@ -331,7 +333,7 @@ if __name__ == '__main__':
             print ("Loading data from snapshot {num}...".format(num=snapnum))
             gal_quants0, gal_quants3, gal_quants4 = get_galquants_data(params, snapnum, snapdir, stars, special_refine_pos)
 
-            refine_pos_proj = gal_quants3.data["Coordinates"]#[0]
+            refine_pos_proj = gal_quants3.data["Coordinates"][0]
             print (refine_pos_proj) 
             if special_refine_pos_fix:
                 # Use the original refinement particle as the special position
