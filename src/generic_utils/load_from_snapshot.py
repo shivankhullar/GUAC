@@ -211,6 +211,9 @@ def load_from_snapshot(value,ptype,sdir,snum,particle_mask=numpy.zeros(0),axis_m
         if((value=='Density')|(value=='Pressure')): q *= hinv/(rconv*rconv*rconv); # density = mass/comoving length^3
         if((value=='StellarFormationTime')&(cosmological==False)): q*=hinv; # time has h^-1 in non-cosmological runs
         if((value=='Masses')|('BH_Mass' in value)|(value=='CosmicRayEnergy')|(value=='PhotonEnergy')): q*=hinv; # mass x [no-h] units
+        if((value=='DensityGradient')): q*=hinv/(hinv*hinv*hinv*hinv); # units are -physical- by construction for these, but still need h factors
+        if((value=='VelocityGradient')|(value=='Acceleration')|(value=='HydroAcceleration')|(value=='RadiativeAcceleration')): q*=1./hinv; # units are -physical- by construction for these, but still need h factors
+        
 
     # return final value, if we have not already
     particle_mask=numpy.array(particle_mask)
