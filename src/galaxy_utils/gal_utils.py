@@ -64,8 +64,8 @@ class GalQuants():
 
             #proj = Get_Galaxy_Proj_Matrix(self.params, self.snapnum)
         self.gal_centre_proj = np.matmul(self.proj, self.gal_centre)
-        print ("Projected quantities:")
-        print (self.gal_centre_proj, self.gal_centre, self.proj)
+        #print ("Projected quantities:")
+        #print (self.gal_centre_proj, self.gal_centre, self.proj)
         self.spherical_cut(coords_data)
         init_coords_x = np.take(coords_data[:,0], self.sphere_inds)
         init_coords_y = np.take(coords_data[:,1], self.sphere_inds)
