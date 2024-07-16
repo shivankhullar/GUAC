@@ -8,6 +8,7 @@ Date: April 2024
 #import sys
 #sys.path.append('/src/generic_utils/')
 from generic_utils.fire_utils import *
+import generic_utils.constants as const
 
 class GalQuants():
     """
@@ -163,8 +164,8 @@ def get_vc(gal_quants0, gal_quants1, gal_quants4, r_gals):
         m4 = np.take(gal_quants4.data["Masses"], np.where(gal_quants4.data["GalDist"]<=r_gal)[0])
 
         m_tot = np.sum(m0)+np.sum(m1)+np.sum(m4) #np.sum(m2)+
-        vc.append(np.sqrt(G*m_tot*1e10/r_gal))                #G is in Msun-1 Myr^-2 kpc^3. 
+        vc.append(np.sqrt(const.G*const.Msun/const.kpc**3*const.Myr**2*m_tot*1e10/r_gal))                #G is in Msun-1 Myr^-2 kpc^3. 
 
-    vc = np.array(vc)*kpc/Myr/1e5     #in km/s
+    vc = np.array(vc)*const.kpc/const.Myr/1e5     #in km/s
 
     return vc
