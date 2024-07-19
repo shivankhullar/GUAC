@@ -129,8 +129,21 @@ class GalQuants():
             final_data_x = np.take(temp_data_x, self.disk_inds)
             final_data_y = np.take(temp_data_y, self.disk_inds)
             final_data_z = np.take(temp_data_z, self.disk_inds)
+            final_data = np.array([final_data_x, final_data_y, final_data_z]).T
+            #self.data[key] = np.array([final_data_x, final_data_y, final_data_z]).T
+
+            print ("Starting projection...")
+
+            proj_final_data = []
+            for i in range(0, len(final_data)):
+                proj_final_datum = np.matmul(self.proj, final_data[i])
+                proj_final_data.append(proj_final_datum)
+                #if i%5000==0:
+                    #print('Percent complete:', i/len(gas_coords)*100)
             
-            self.data[key] = np.array([final_data_x, final_data_y, final_data_z]).T
+            self.data[key] = np.array(proj_final_data)
+            print ("Projection done...")
+            
 
 
 
