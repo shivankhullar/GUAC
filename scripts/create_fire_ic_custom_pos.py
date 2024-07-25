@@ -11,6 +11,10 @@ create_fire_ic_custom_pos: "Create initial conditions file for FIRE+STARFORGE si
 
 Usage: create_fire_ic_custom_pos.py [options]
 
+# e.g. python create_fire_ic_custom_pos.py --path=../../../FIRE-2/m12i_final/ --starting_snap=610 
+# --custom_refine_pos=41845.905,44175.435,46314.650 --refine_pos_snap=615 
+# --ic_path=Cloud0040Snap610_gas_dist0-03/ --dist_cut_off=0.03 --follow_particle_types=0
+
 Options:
     -h, --help                                          Show this screen
     --snapdir=<snapdir>                                 Are snapshots in a snapdir directory? [default: True]
@@ -102,7 +106,7 @@ def create_hdf5_file(snap_num, com_coords, com_vels, params, ic_path):
     collisionless_data_dict_list = []
 
     for i in range(0,parts):
-        print ('Reading file {i} of {parts}....'.format(i=i, parts=parts))
+        print ('Reading file {k} of {parts}....'.format(k=i+1, parts=parts))
         file_name = params.path+'snapdir_{snap_num}/snapshot_{snap_num}.{part}.hdf5'.format(snap_num=snap_num, part=i)
         f = h5py.File(file_name, 'r')
         header_data_dict = {}
@@ -220,7 +224,7 @@ def create_hdf5_file(snap_num, com_coords, com_vels, params, ic_path):
     f.close()
 
 
-def get_close_particles(refine_pos_snap, params, refine_coords, dist_cut_off, follow_particle_types):
+def get_close_particles(refine_pos_snap, params, refine_coords, dist_cut_off, follow_particle_types, units_to_physical=False):
     """
     This function gets the particles that are close to the custom position of the refinement particle
     Inputs:
@@ -235,20 +239,32 @@ def get_close_particles(refine_pos_snap, params, refine_coords, dist_cut_off, fo
         close_pID_array: the particle ID array of the particles that are close to the custom position
     """
 
-    print ("Getting close particles...")
+    print ("Getting close particles...", refine_coords)
     #gas_coords, gas_masses, gas_vels, gas_ages, gas_pID_array = load_snapshot_data(params, refine_pos_snap, 0, units_to_physical=False)
     #star_coords, star_masses, star_vels, star_ages, star_pID_array = load_snapshot_data(params, refine_pos_snap, 4, units_to_physical=False)
-    hubble_constant = 0.70124427
+    
+    #hubble_constant = 0.70124427
     ##final_refine_coords = np.array([41845.905, 44175.435, 46314.650])*hubble_constant
     
     count = 0
     for ptype in follow_particle_types:
         print ("Getting data for particle type...", ptype)
-        coords, masses, vels, ages, pID_array = load_snapshot_data(params, refine_pos_snap, ptype, units_to_physical=False)
+        snapdir = params.path+'snapdir_{num}/'.format(num=refine_pos_snap)
+        ascale = load_from_snapshot.load_from_snapshot('Time', ptype, snapdir, refine_pos_snap, units_to_physical=units_to_physical)
+        hubble = load_from_snapshot.load_from_snapshot('HubbleParam', ptype, snapdir, refine_pos_snap, units_to_physical=units_to_physical)
+        hinv = 1/hubble
+        rconv = ascale*hinv
+        coords, masses, vels, ages, pID_array = load_snapshot_data(params, refine_pos_snap, ptype, units_to_physical=units_to_physical)
 
         print ("Calculating distances from", refine_coords, "for particle type...", ptype)
         dist_from_refine_coords = np.linalg.norm(coords - refine_coords, axis=1)
-        inds = np.where(dist_from_refine_coords<dist_cut_off*hubble_constant)
+        #inds = np.where(dist_from_refine_coords<dist_cut_off*hubble_constant)
+        # dist_cut_off is in physical units 
+        if units_to_physical:
+            inds = np.where(dist_from_refine_coords<dist_cut_off)
+        else:
+            inds = np.where(dist_from_refine_coords<dist_cut_off/rconv)
+        
         close_coords = coords[inds]
         close_vels = vels[inds]
         close_masses = masses[inds]
@@ -273,7 +289,7 @@ def get_close_particles(refine_pos_snap, params, refine_coords, dist_cut_off, fo
     return final_coords, final_vels, final_masses, final_pID_array
 
 
-def get_COM_coords_vels(start_snap, params, tracked_pID_array, follow_particle_types):
+def get_COM_coords_vels(start_snap, params, tracked_pID_array, follow_particle_types, units_to_physical=False):
     """
     This function calculates the center of mass coordinates 
     for a set of particles defined at some snapshot
@@ -294,7 +310,7 @@ def get_COM_coords_vels(start_snap, params, tracked_pID_array, follow_particle_t
     count = 0
     for ptype in follow_particle_types:
         print ("Getting data for particle type...", ptype)
-        coords, masses, vels, ages, pID_array = load_snapshot_data(params, refine_pos_snap, ptype, units_to_physical=False)
+        coords, masses, vels, ages, pID_array = load_snapshot_data(params, start_snap, ptype, units_to_physical=units_to_physical)
         if count == 0:
             final_coords = coords
             final_vels = vels
@@ -313,7 +329,8 @@ def get_COM_coords_vels(start_snap, params, tracked_pID_array, follow_particle_t
     #coords, masses, vels, _, pID_array = load_snapshot_data(params, start_snap, 0, units_to_physical=False)
     
     # Find the particles in the cloud that are in the tracked cloud
-    tracked_inds = np.where(np.isin(final_pID_array, tracked_pID_array).all(axis=1))[0]
+    #tracked_inds = np.where(np.isin(final_pID_array, tracked_pID_array).all(axis=1))[0]
+    tracked_inds = np.where(np.isin(final_pID_array[:,0], tracked_pID_array[:,0]))[0]
     print ("Tracked particle number:", len(tracked_inds))
     
     tracked_coords = final_coords[tracked_inds]
@@ -322,10 +339,11 @@ def get_COM_coords_vels(start_snap, params, tracked_pID_array, follow_particle_t
     
     # Find the median coordinates of the tracked particles
     median_coords = np.median(tracked_coords, axis=0)
+    print (median_coords)
 
     # Find the particles that are within a certain distance of the median coordinates
     dist_from_median = np.linalg.norm(tracked_coords - median_coords, axis=1)
-    inds = np.where(dist_from_median<4)
+    inds = np.where(dist_from_median<2)
     tracked_coords = tracked_coords[inds]
     tracked_masses = tracked_masses[inds]
     tracked_vels = tracked_vels[inds]
@@ -340,9 +358,7 @@ def get_COM_coords_vels(start_snap, params, tracked_pID_array, follow_particle_t
 
     print ("COM coords =", com_coords)
     print ("COM vels =", com_vels)
-    return com_coords, com_vels
-
-
+    return com_coords, com_vels, tracked_coords, tracked_vels
 if __name__ == '__main__':
     args = docopt(__doc__)
     path = args['--path']
@@ -377,6 +393,7 @@ if __name__ == '__main__':
     dat_file_header_size=8
     snapshot_prefix="Snap"
     star_data_sub_dir = "StarData/"
+    gas_data_sub_dir = "GasData/"
     cph_sub_dir="CloudPhinderData/"
     #cph_sub_dir='m12i_restart/'
     frac_thresh='thresh'+str(args['--threshold'])
@@ -394,7 +411,7 @@ if __name__ == '__main__':
 
     params = Params(path, nmin, vir, sub_dir, start_snap, last_snap, filename_prefix, cloud_num_digits, \
                     snapshot_num_digits, cloud_prefix, snapshot_prefix, age_cut, \
-                    dat_file_header_size, star_data_sub_dir, cph_sub_dir,\
+                    dat_file_header_size, gas_data_sub_dir, star_data_sub_dir, cph_sub_dir,\
                     image_path, image_filename_prefix,\
                     image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim, r_gal=r_gal, h=h)
 
@@ -406,8 +423,9 @@ if __name__ == '__main__':
 
     #file_snap_num = chain.snap_nums[0]
     file_snap_num = starting_snap
-    com_coords, com_vels = get_COM_coords_vels(file_snap_num, params, final_pID_array, follow_particle_types)
-
+    com_coords, com_vels, _, _ = get_COM_coords_vels(file_snap_num, params, final_pID_array, follow_particle_types)
+    
+    print ("CoM info:", com_coords, com_vels)
     ic_path = ic_path #+'/'#+chain.search_key+'/'
     if not os.path.exists(ic_path):
         os.makedirs(ic_path)
