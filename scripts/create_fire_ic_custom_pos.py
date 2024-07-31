@@ -15,6 +15,9 @@ Usage: create_fire_ic_custom_pos.py [options]
 # --custom_refine_pos=41845.905,44175.435,46314.650 --refine_pos_snap=615 
 # --ic_path=Cloud0040Snap610_gas_dist0-03/ --dist_cut_off=0.03 --follow_particle_types=0
 
+
+#create_fire_ic_custom_pos.py --path=../../../FIRE-2/m12i_final/ --starting_snap=610 --refine_pos=41845.905,44175.435,46314.650 --refine_pos_snap=615 --ic_path=Cloud0040Snap610_refineflag_gas_star_dist0-03_all_fixed --dist_cut_off=0.03 --follow_particle_types=0
+
 Options:
     -h, --help                                          Show this screen
     --snapdir=<snapdir>                                 Are snapshots in a snapdir directory? [default: True]
@@ -27,6 +30,7 @@ Options:
     --custom_refine_pos=<custom_refine_pos>             Custom position for the refinement particle [default: 0,0,0]
     --refine_pos_snap=<refine_pos_snap>                 Snapshot number corresponding to the custom position of the refinement particle [default: 600]
     --starting_snap=<starting_snap>                     Starting snapshot number [default: 600]
+    --flag_based_refinement=<flag_based_refinement>     Should we add refinement tags to particles? [default: False]
 """
 
 from generic_utils.fire_utils import *
@@ -224,6 +228,7 @@ def create_hdf5_file(snap_num, com_coords, com_vels, params, ic_path):
     f.close()
 
 
+
 def get_close_particles(refine_pos_snap, params, refine_coords, dist_cut_off, follow_particle_types, units_to_physical=False):
     """
     This function gets the particles that are close to the custom position of the refinement particle
@@ -359,6 +364,254 @@ def get_COM_coords_vels(start_snap, params, tracked_pID_array, follow_particle_t
     print ("COM coords =", com_coords)
     print ("COM vels =", com_vels)
     return com_coords, com_vels, tracked_coords, tracked_vels
+
+
+
+def get_pIDs_to_tag(params, start_snap, refine_pos_snap, final_refine_coords, dist_cut_off, follow_particle_types, units_to_physical=False):
+    """
+    This function finds the particles to be tagged for refinement
+
+    Inputs:
+        snap_num: the snapshot number
+        params: the Params object
+        pID_array: the pID array of the set of particles 
+                    to calculate the COM for
+
+    Outputs:
+        com_coords: the center of mass coordinates
+        com_vels: the center of mass velocities
+        cloud_coords: the coordinates of the cloud
+    """
+
+    _, _, _, tracked_pID_array = get_close_particles(refine_pos_snap, params, final_refine_coords, dist_cut_off, follow_particle_types)
+
+    print ("Getting COM coords and vels...")
+    # Load the snapshot data for the starting snapshot
+    count = 0
+    # We will only use the gas particles for tagging, but this can be modified in principle to include stars as well
+    follow_particle_types = [0]
+    for ptype in follow_particle_types:
+        print ("Getting data for particle type...", ptype)
+        coords, masses, vels, ages, pID_array = load_snapshot_data(params, start_snap, ptype, units_to_physical=units_to_physical)
+        if count == 0:
+            final_coords = coords
+            final_vels = vels
+            final_masses = masses
+            final_pID_array = pID_array
+
+        if count > 0:
+            print ("Appending data...", len(coords))
+            final_coords = np.vstack((final_coords, coords))
+            final_vels = np.vstack((final_vels, vels))
+            final_masses = np.concatenate((final_masses, masses))
+            final_pID_array = np.vstack((final_pID_array, pID_array))
+
+        count += 1
+
+    #coords, masses, vels, _, pID_array = load_snapshot_data(params, start_snap, 0, units_to_physical=False)
+    
+    # Find the particles in the cloud that are in the tracked cloud
+    #tracked_inds = np.where(np.isin(final_pID_array, tracked_pID_array).all(axis=1))[0]
+    tracked_inds = np.where(np.isin(final_pID_array[:,0], tracked_pID_array[:,0]))[0]
+    print ("Tracked particle number:", len(tracked_inds))
+    
+    tracked_coords = final_coords[tracked_inds]
+    tracked_masses = final_masses[tracked_inds]
+    tracked_vels = final_vels[tracked_inds]
+    # The pIDs of the particles to be tagged (as in the starting snapshot)
+    pID_array_for_tagging = final_pID_array[tracked_inds]
+    
+    # Find the median coordinates of the tracked particles
+    median_coords = np.median(tracked_coords, axis=0)
+    print (median_coords)
+
+    # Find the particles that are within a certain distance of the median coordinates
+    dist_from_median = np.linalg.norm(tracked_coords - median_coords, axis=1)
+    inds = np.where(dist_from_median<2)
+    tracked_coords = tracked_coords[inds]
+    tracked_masses = tracked_masses[inds]
+    tracked_vels = tracked_vels[inds]
+    pID_array_for_tagging = pID_array_for_tagging[inds]
+
+    print ("Final tracked particle number:", len(tracked_coords))
+
+    # Calculate the center of mass coordinates
+    com_coords = np.sum(tracked_coords*tracked_masses[:, np.newaxis], axis=0)/np.sum(tracked_masses)
+
+    # Calculate the center of mass velocities
+    com_vels = np.sum(tracked_vels*tracked_masses[:, np.newaxis], axis=0)/np.sum(tracked_masses)
+
+    print ("COM coords =", com_coords)
+    print ("COM vels =", com_vels)
+    return com_coords, com_vels, pID_array_for_tagging
+
+
+def create_hdf5_file_flag_based_refinement(snap_num, params, refine_pos_snap, final_refine_coords, dist_cut_off, follow_particle_types, ic_path):
+    """
+    This is a function to create an hdf5 file with the tags on particles which are to be used for calculating the COM of the refinement region.
+    Inputs:
+        snap_num: the snapshot number
+    
+    Outputs:
+        None
+    """
+    parts = 4
+    header_data_dict_list = []
+    gas_data_dict_list = []
+    star_data_dict_list = []
+    dm_data_dict_list = []
+    collisionless_data_dict_list = []
+
+    for i in range(0,parts):
+        print ('Reading file {k} of {parts}....'.format(k=i+1, parts=parts))
+        file_name = params.path+'snapdir_{snap_num}/snapshot_{snap_num}.{part}.hdf5'.format(snap_num=snap_num, part=i)
+        f = h5py.File(file_name, 'r')
+        header_data_dict = {}
+        gas_data_dict = {}
+        star_data_dict = {}
+        dm_data_dict = {}
+        collisionless_data_dict = {}
+        for key in f.keys():
+            #print(key)
+            if key == 'Header':
+                for key2 in f[key].attrs.keys():
+                    #print (key2)
+                    header_data_dict[key2] = f[key].attrs[key2]
+            
+            if key == 'PartType0':
+                for key2 in f[key].keys():
+                    gas_data_dict[key2] = np.array(f[key][key2])
+
+            if key == 'PartType1':
+                for key2 in f[key].keys():
+                    dm_data_dict[key2] = np.array(f[key][key2])
+            
+            if key == 'PartType2':
+                for key2 in f[key].keys():
+                    collisionless_data_dict[key2] = np.array(f[key][key2])
+
+            if key == 'PartType4':
+                for key2 in f[key].keys():
+                    star_data_dict[key2] = np.array(f[key][key2])
+            
+        header_data_dict_list.append(header_data_dict)
+        gas_data_dict_list.append(gas_data_dict)
+        star_data_dict_list.append(star_data_dict)
+        dm_data_dict_list.append(dm_data_dict)
+        collisionless_data_dict_list.append(collisionless_data_dict)
+        f.close()
+
+    
+    # Now we can create the new hdf5 file with the SMBH particle (PartType3) added
+    print ('Writing to file now ....')
+
+    if not os.path.exists(ic_path):
+        os.makedirs(ic_path)
+
+    file_name = ic_path+'snapshot_{snap_num}.hdf5'.format(snap_num=snap_num)
+    f = h5py.File(file_name, 'w')
+    header = f.create_group('Header')
+    for key in header_data_dict_list[0].keys():
+        if key=='NumPart_ThisFile':
+            arr = header_data_dict_list[0]['NumPart_ThisFile'] + \
+                    header_data_dict_list[1]['NumPart_ThisFile'] + \
+                        header_data_dict_list[2]['NumPart_ThisFile'] + \
+                            header_data_dict_list[3]['NumPart_ThisFile']
+            #arr[3] = 1
+            header.attrs.create(key, arr)
+        else:
+            header.attrs.create(key, header_data_dict_list[0][key])
+
+    part0 = f.create_group('PartType0')
+    for key in gas_data_dict_list[0].keys():
+        if key == 'Coordinates' or key == 'Velocities':
+            arr = np.vstack((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
+        else:
+            arr = np.concatenate((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
+        part0.create_dataset(key, data=arr)
+    
+
+
+
+    # Add the refinement flag to the gas particles
+    # The refinement flag array is a 1D array with the same length as the number of gas particles, 1 for particles to be used in the COM calculation and 0 otherwise
+    _, _, pID_array_for_tagging = get_pIDs_to_tag(params, snap_num, refine_pos_snap, final_refine_coords, dist_cut_off, follow_particle_types, units_to_physical=False)
+    
+    # Now whereever the pID_array_for_tagging matches the gas particle pID, we set the refinement flag to 1
+    key = 'ParticleIDs'
+    pIDs = np.concatenate((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
+    key = 'ParticleIDGenerationNumber'
+    pID_gen_nums = np.concatenate((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
+    key = 'ParticleChildIDsNumber'
+    pID_child_nums = np.concatenate((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
+    pID_array = np.column_stack((pIDs, pID_gen_nums, pID_child_nums))
+    
+    # Now check where pID_array_for_tagging matches the pID array fully and set those indices to 1
+    refinement_flag_array = np.zeros(len(pIDs))
+    inds = np.where((pID_array==pID_array_for_tagging[:,None]).all(-1))[1]
+    refinement_flag_array[inds]=1
+    #refinement_flag_array = refinement_flag_array.astype('uint32')
+    refinement_flag_array = refinement_flag_array.astype('int32')
+    part0.create_dataset("RefinementFlag", data=refinement_flag_array)
+    
+
+
+
+
+
+
+    part1 = f.create_group('PartType1')
+    for key in dm_data_dict_list[0].keys():
+        if key == 'Coordinates' or key == 'Velocities':
+            arr = np.vstack((dm_data_dict_list[0][key], dm_data_dict_list[1][key], dm_data_dict_list[2][key], dm_data_dict_list[3][key]))
+        else:
+            arr = np.concatenate((dm_data_dict_list[0][key], dm_data_dict_list[1][key], dm_data_dict_list[2][key], dm_data_dict_list[3][key]))
+        part1.create_dataset(key, data=arr)
+    
+    pIDs = np.concatenate((dm_data_dict_list[0][key], dm_data_dict_list[1][key], dm_data_dict_list[2][key], dm_data_dict_list[3][key]))
+    refine_flag_array = np.zeros(len(pIDs))
+    refine_flag_array = refine_flag_array.astype('int32')
+    part1.create_dataset("RefinementFlag", data=refine_flag_array)
+
+    
+    part2 = f.create_group('PartType2')
+    for key in collisionless_data_dict_list[0].keys():
+        if key == 'Coordinates' or key == 'Velocities':
+            arr = np.vstack((collisionless_data_dict_list[0][key], collisionless_data_dict_list[1][key], collisionless_data_dict_list[2][key], collisionless_data_dict_list[3][key]))
+        else:
+            arr = np.concatenate((collisionless_data_dict_list[0][key], collisionless_data_dict_list[1][key], collisionless_data_dict_list[2][key], collisionless_data_dict_list[3][key]))
+        part2.create_dataset(key, data=arr)
+    pIDs = np.concatenate((collisionless_data_dict_list[0][key], collisionless_data_dict_list[1][key], collisionless_data_dict_list[2][key], collisionless_data_dict_list[3][key]))
+    refine_flag_array = np.zeros(len(pIDs))
+    refine_flag_array = refine_flag_array.astype('int32')
+    part2.create_dataset("RefinementFlag", data=refine_flag_array)
+
+    
+
+    part4 = f.create_group('PartType4')
+    for key in star_data_dict_list[0].keys():
+        if key == 'Coordinates' or key == 'Velocities':
+            arr = np.vstack((star_data_dict_list[0][key], star_data_dict_list[1][key], star_data_dict_list[2][key], star_data_dict_list[3][key]))
+        else:
+            arr = np.concatenate((star_data_dict_list[0][key], star_data_dict_list[1][key], star_data_dict_list[2][key], star_data_dict_list[3][key]))
+        part4.create_dataset(key, data=arr)
+    pIDs = np.concatenate((star_data_dict_list[0][key], star_data_dict_list[1][key], star_data_dict_list[2][key], star_data_dict_list[3][key]))
+    refine_flag_array = np.zeros(len(pIDs))
+    refine_flag_array = refine_flag_array.astype('int32')
+    part4.create_dataset("RefinementFlag", data=refine_flag_array)
+
+    f.close()
+
+
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     args = docopt(__doc__)
     path = args['--path']
@@ -370,9 +623,7 @@ if __name__ == '__main__':
     dist_cut_off = float(args['--dist_cut_off'])
     follow_particle_types = convert_to_array(args['--follow_particle_types'], dtype=np.int32)
     final_refine_coords = convert_to_array(args['--custom_refine_pos'], dtype=np.float64)
-    hubble_constant = 0.70124427
-    final_refine_coords = final_refine_coords*hubble_constant
-        
+    flag_based_refinement = convert_to_bool(args['--flag_based_refinement'])
 
     ## Some bookkeeping
     #path = "../../../FIRE/m12i_final/"
@@ -417,20 +668,38 @@ if __name__ == '__main__':
 
     print ("Path = ", params.path)
 
-    _, _, _, final_pID_array = get_close_particles(refine_pos_snap, params, final_refine_coords, dist_cut_off, follow_particle_types)
 
-    #tracked_cloud_pID_array = get_tracked_cloud_pIDs(chain, params)
+    
+    snap_num = refine_pos_snap
+    snapdir = params.path+'snapdir_{num}/'.format(num=snap_num)
+    ascale = load_from_snapshot.load_from_snapshot('Time', 0, snapdir, snap_num, units_to_physical=True)
+    hubble = load_from_snapshot.load_from_snapshot('HubbleParam', 0, snapdir, snap_num, units_to_physical=True)
+    hinv = 1/hubble
+    rconv=ascale*hinv
+    print ("Converting to cosmological distance using factor:", 1/rconv)
+    final_refine_coords = final_refine_coords/rconv
+    #hubble_constant = 0.70124427
+    #final_refine_coords = final_refine_coords*hubble_constant
+        
+    if flag_based_refinement:
+        print ("Flag Based Refinement mode...")
+        #get_pIDs_to_tag(params, file_snap_num, refine_pos_snap, final_refine_coords, dist_cut_off, follow_particle_types, units_to_physical=False)
+        create_hdf5_file_flag_based_refinement(starting_snap, params, refine_pos_snap, final_refine_coords, dist_cut_off, follow_particle_types, ic_path)
 
-    #file_snap_num = chain.snap_nums[0]
-    file_snap_num = starting_snap
-    com_coords, com_vels, _, _ = get_COM_coords_vels(file_snap_num, params, final_pID_array, follow_particle_types)
-    
-    print ("CoM info:", com_coords, com_vels)
-    ic_path = ic_path #+'/'#+chain.search_key+'/'
-    if not os.path.exists(ic_path):
-        os.makedirs(ic_path)
-    
-    create_hdf5_file(file_snap_num, com_coords, com_vels, params, ic_path)
+    else:
+        _, _, _, final_pID_array = get_close_particles(refine_pos_snap, params, final_refine_coords, dist_cut_off, follow_particle_types)
+        #tracked_cloud_pID_array = get_tracked_cloud_pIDs(chain, params)
+        #file_snap_num = chain.snap_nums[0]
+        file_snap_num = starting_snap
+        com_coords, com_vels, _, _ = get_COM_coords_vels(file_snap_num, params, final_pID_array, follow_particle_types)
+        
+        print ("CoM info:", com_coords, com_vels)
+        ic_path = ic_path #+'/'#+chain.search_key+'/'
+        if not os.path.exists(ic_path):
+            os.makedirs(ic_path)
+
+        create_hdf5_file(file_snap_num, com_coords, com_vels, params, ic_path)
+
     print("HDF5 file created successfully")
 
 
