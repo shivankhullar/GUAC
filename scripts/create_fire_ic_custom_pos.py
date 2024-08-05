@@ -554,7 +554,22 @@ def create_hdf5_file_flag_based_refinement(snap_num, params, refine_pos_snap, fi
     refinement_flag_array = refinement_flag_array.astype('int32')
     part0.create_dataset("RefinementFlag", data=refinement_flag_array)
     
-
+    key = "Coordinates"
+    coords_arr = np.vstack((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
+    key = "Masses"        
+    masses_arr = np.concatenate((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
+    
+    com_coords_x = np.take(coords_arr[:,0], inds)
+    com_coords_y = np.take(coords_arr[:,1], inds)
+    com_coords_z = np.take(coords_arr[:,2], inds)
+    com_masses = np.take(masses_arr, inds)
+    refinement_center_x = np.sum(com_coords_x*com_masses)/np.sum(com_masses)
+    refinement_center_y = np.sum(com_coords_y*com_masses)/np.sum(com_masses)
+    refinement_center_z = np.sum(com_coords_z*com_masses)/np.sum(com_masses)
+    refinement_center = np.array([refinement_center_x, refinement_center_y, refinement_center_z]).T
+    print ("Refinement Center:", refinement_center)
+    
+    header.attrs.create(key, refinement_center)
 
 
 
