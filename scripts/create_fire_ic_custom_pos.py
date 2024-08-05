@@ -569,7 +569,7 @@ def create_hdf5_file_flag_based_refinement(snap_num, params, refine_pos_snap, fi
     refinement_center = np.array([refinement_center_x, refinement_center_y, refinement_center_z]).T
     print ("Refinement Center:", refinement_center)
     
-    header.attrs.create(key, refinement_center)
+    header.attrs.create("RefinementRegionCenter", refinement_center)
 
 
 
