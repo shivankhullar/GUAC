@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 """
 vel_bg_map.py: "Create initial conditions file for FIRE+STARFORGE simulation 
