@@ -62,7 +62,7 @@ def save_data(save_path, name, data, snapnum):
 @njit(nopython=True)
 def compute_com_vel(coords, vels, masses, cut_off_distance):
     num_particles = len(coords)
-    vels_sub_1x = np.zeros_like(vels)
+    vels_sub_1x = vels.copy()
     for i in range(num_particles):
         pos = coords[i]
         dist = np.empty(num_particles)
@@ -106,16 +106,23 @@ def process_snapshot(params, snapnum, cut_off_distance):
     coords = load_fire_data("Coordinates", 0, snapdir, snapnum)
     hsml = load_fire_data("SmoothingLength", 0, snapdir, snapnum)
     vels = load_fire_data("Velocities", 0, snapdir, snapnum)
-
+    print("Data loaded")
     
-    vels_sub_1x = compute_com_vel(coords, vels, masses, cut_off_distance)
+    gal_quants0 = GalQuants(params, snapnum, r_gal, h)
+    gal_quants0.project(coords)
+    gal_quants0.add_key("Masses", masses, 1)
+    gal_quants0.add_key("Velocities", vels, 3)
+    gal_quants0.add_key("SmoothingLength", hsml, 1)
+    
+    vels_sub_1x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance)
     print ("1x done in ", time.time() - start)
-    vels_sub_5x = compute_com_vel(coords, vels, masses, cut_off_distance * 5)
+    vels_sub_5x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance * 5)
     print ("5x done in ", time.time() - start)
-    vels_sub_0_5x = compute_com_vel(coords, vels, masses, cut_off_distance * 0.5)
+    vels_sub_0_5x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance * 0.5)
     print ("0.5x done in ", time.time() - start)
-    vels_sub_0_1x = compute_com_vel(coords, vels, masses, cut_off_distance * 0.1)
+    vels_sub_0_1x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance * 0.1)
     print ("0.1x done in ", time.time() - start)
+
 
     save_data(params.save_path, "vels_sub_1x", vels_sub_1x, snapnum)
     save_data(params.save_path, "vels_sub_5x", vels_sub_5x, snapnum)
