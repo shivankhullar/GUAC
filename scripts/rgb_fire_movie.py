@@ -35,7 +35,8 @@ import glob
 import yt
 import h5py
 from meshoid import Meshoid
-#matplotlib.use('Agg')
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib import colors
 import colorcet as cc
 from matplotlib.cm import get_cmap
@@ -116,12 +117,12 @@ def plot_rgb_galaxy(gal_quants0, snapnum, image_box_size, save_path, rectangle_m
             if not os.path.exists(save_path_ext):
                 os.makedirs(save_path_ext)
             fig, ax = plt.subplots()
-            fig.set_size_inches(9,16)
+            fig.set_size_inches(16,9)
             p = ax.imshow(rgb_map[int(3.5*res/16):int(12.5*res/16),:,:], origin='lower')
             plt.xticks([])
             plt.yticks([])
             plt.tight_layout()
-            plt.savefig(save_path_ext+f'rgb_galaxy_{snapnum}.jpg', dpi=100)
+            plt.savefig(save_path_ext+f'rgb_galaxy_{snapnum}.jpg', dpi=200)
             #plt.show()
             plt.close()
 
@@ -134,7 +135,7 @@ def plot_rgb_galaxy(gal_quants0, snapnum, image_box_size, save_path, rectangle_m
         plt.xticks([])
         plt.yticks([])
         plt.tight_layout()
-        plt.savefig(save_path_ext+f'rgb_galaxy_{snapnum}.jpg', dpi=100)
+        plt.savefig(save_path_ext+f'rgb_galaxy_{snapnum}.jpg', dpi=200)
         #plt.show()
         plt.close()
 
