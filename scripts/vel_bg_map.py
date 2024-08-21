@@ -15,7 +15,7 @@ Options:
     -h, --help                                          Show this screen
     --snapdir=<snapdir>                                 Are snapshots in a snapdir directory? [default: True]
     --path=<path>                                       Path to the simulation directory [default: ./]
-    --sim=<sim>                                         Simulation name [default: m12i_final_fb_7k]
+    --sim=<sim>                                         Simulation name [default: ./]
     --save_path=<save_path>                             Path to save the images [default: ./]
     --image_box_size=<image_box_size>                   Size of the image box [default: 15]
     --snapnum_range=<snapnum_range>                     Range of snapshots to plot [default: 0,100]
@@ -50,63 +50,47 @@ from scipy import interpolate
 
 import numpy as np
 import multiprocessing as mp
-from numba import njit, prange
+from numba import njit, prange, jit
 from docopt import docopt
 
 def save_data(save_path, name, data, snapnum):
     filename = save_path + name + "_snap" + str(snapnum) + ".npy"
     np.save(filename, data)
 
-@njit(parallel=True)
+#@njit(parallel=False)
+
+@njit(nopython=True)
 def compute_com_vel(coords, vels, masses, cut_off_distance):
     num_particles = len(coords)
-    vels_sub_1x = vels.copy()
-    vels_sub_5x = vels.copy()
-    vels_sub_0_5x = vels.copy()
-    vels_sub_0_1x = vels.copy()
-
-    for i in prange(num_particles):
+    vels_sub_1x = np.zeros_like(vels)
+    for i in range(num_particles):
         pos = coords[i]
-        vel = vels[i]
-        dists = np.linalg.norm(coords - pos, axis=1)
+        dist = np.empty(num_particles)
+        total_mass = 0
+        mass_vel_x = 0
+        mass_vel_y = 0
+        mass_vel_z = 0
+        
+        for j in range(num_particles):
+            x_dist = coords[j][0] - pos[0]
+            x_dist = x_dist**2
+            y_dist = coords[j][1] - pos[1]
+            y_dist = y_dist**2
+            z_dist = coords[j][2] - pos[2]
+            z_dist = z_dist**2
+            dist[j] = np.sqrt(x_dist + y_dist + z_dist)
+            
+            if dist[j] < cut_off_distance:
+                total_mass += masses[j]
+                mass_vel_x += masses[j]*vels[j, 0]
+                mass_vel_y += masses[j]*vels[j, 1]
+                mass_vel_z += masses[j]*vels[j, 2]
+        
+        vels_sub_1x[i, 0] -= mass_vel_x/total_mass
+        vels_sub_1x[i, 1] -= mass_vel_y/total_mass
+        vels_sub_1x[i, 2] -= mass_vel_z/total_mass
 
-        # 1x
-        mask = dists < cut_off_distance
-        if mask.any():
-            com_vel_x = np.sum(vels[mask, 0] * masses[mask]) / np.sum(masses[mask])
-            com_vel_y = np.sum(vels[mask, 1] * masses[mask]) / np.sum(masses[mask])
-            com_vel_z = np.sum(vels[mask, 2] * masses[mask]) / np.sum(masses[mask])
-            com_vel = np.array([com_vel_x, com_vel_y, com_vel_z])
-            vels_sub_1x[i] -= com_vel
-
-        # 5x
-        mask = dists < cut_off_distance * 5
-        if mask.any():
-            com_vel_x = np.sum(vels[mask, 0] * masses[mask]) / np.sum(masses[mask])
-            com_vel_y = np.sum(vels[mask, 1] * masses[mask]) / np.sum(masses[mask])
-            com_vel_z = np.sum(vels[mask, 2] * masses[mask]) / np.sum(masses[mask])
-            com_vel = np.array([com_vel_x, com_vel_y, com_vel_z])
-            vels_sub_5x[i] -= com_vel
-
-        # 0.5x
-        mask = dists < cut_off_distance * 0.5
-        if mask.any():
-            com_vel_x = np.sum(vels[mask, 0] * masses[mask]) / np.sum(masses[mask])
-            com_vel_y = np.sum(vels[mask, 1] * masses[mask]) / np.sum(masses[mask])
-            com_vel_z = np.sum(vels[mask, 2] * masses[mask]) / np.sum(masses[mask])
-            com_vel = np.array([com_vel_x, com_vel_y, com_vel_z])
-            vels_sub_0_5x[i] -= com_vel
-
-        # 0.1x
-        mask = dists < cut_off_distance * 0.1
-        if mask.any():
-            com_vel_x = np.sum(vels[mask, 0] * masses[mask]) / np.sum(masses[mask])
-            com_vel_y = np.sum(vels[mask, 1] * masses[mask]) / np.sum(masses[mask])
-            com_vel_z = np.sum(vels[mask, 2] * masses[mask]) / np.sum(masses[mask])
-            com_vel = np.array([com_vel_x, com_vel_y, com_vel_z])
-            vels_sub_0_1x[i] -= com_vel
-
-    return vels_sub_1x, vels_sub_5x, vels_sub_0_5x, vels_sub_0_1x
+    return vels_sub_1x
 
 
 
@@ -117,14 +101,21 @@ def process_snapshot(params, snapnum, cut_off_distance):
 
     print("Processing snapshot:", snapnum)
     snapdir = params.path
+    print ("snapdir: ", snapdir)
     masses = load_fire_data("Masses", 0, snapdir, snapnum)
     coords = load_fire_data("Coordinates", 0, snapdir, snapnum)
     hsml = load_fire_data("SmoothingLength", 0, snapdir, snapnum)
     vels = load_fire_data("Velocities", 0, snapdir, snapnum)
 
-    vels_sub_1x, vels_sub_5x, vels_sub_0_5x, vels_sub_0_1x = compute_com_vel(
-        coords, vels, masses, cut_off_distance
-    )
+    
+    vels_sub_1x = compute_com_vel(coords, vels, masses, cut_off_distance)
+    print ("1x done in ", time.time() - start)
+    vels_sub_5x = compute_com_vel(coords, vels, masses, cut_off_distance * 5)
+    print ("5x done in ", time.time() - start)
+    vels_sub_0_5x = compute_com_vel(coords, vels, masses, cut_off_distance * 0.5)
+    print ("0.5x done in ", time.time() - start)
+    vels_sub_0_1x = compute_com_vel(coords, vels, masses, cut_off_distance * 0.1)
+    print ("0.1x done in ", time.time() - start)
 
     save_data(params.save_path, "vels_sub_1x", vels_sub_1x, snapnum)
     save_data(params.save_path, "vels_sub_5x", vels_sub_5x, snapnum)
@@ -133,7 +124,6 @@ def process_snapshot(params, snapnum, cut_off_distance):
 
     print("Time taken for this snapshot:", time.time() - start)
     
-
     del masses, coords, hsml, vels
 
 
@@ -184,7 +174,8 @@ if __name__ == '__main__':
 
     nmin = 10
     vir = 5
-    sim = "m12f_m7e3_MHD_fire3_fireBH_Sep182021_hr_crdiffc690_sdp1e10_gacc31_fa0.5"
+    #sim = "m12f_m7e3_MHD_fire3_fireBH_Sep182021_hr_crdiffc690_sdp1e10_gacc31_fa0.5"
+    sim = args['--sim']
     sub_dir = "CloudTrackerData/n{nmin}_alpha{vir}/".format(nmin=nmin, vir=vir)
     filename = path+sub_dir+filename_prefix+str(start_snap)+"_"+str(last_snap)+"names"+".txt"
 
@@ -197,9 +188,48 @@ if __name__ == '__main__':
                     image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim, r_gal=r_gal, h=h)
         
 
-    with mp.Pool(mp.cpu_count()) as pool:
-        pool.starmap(
-            process_snapshot, [(params, snapnum, cut_off_distance) for snapnum in range(snapnum_range[0], snapnum_range[1] + 1)]
-        )
+    #with mp.Pool(mp.cpu_count()) as pool:
+    #    pool.starmap(
+    #        process_snapshot, [(params, snapnum, cut_off_distance) for snapnum in range(snapnum_range[0], snapnum_range[1] + 1)]
+    #    )
+
+    print("Compiling the function")
+    coords = np.random.rand(100,3)
+    vels = np.random.rand(100,3)
+    masses = np.random.rand(100)
+    compute_com_vel(coords, vels, masses, 0.1)
+    print("Function compiled")
+
+    for snapnum in range(snapnum_range[0], snapnum_range[1] + 1):
+        process_snapshot(params, snapnum, cut_off_distance)
 
 
+"""
+# 5x
+        mask = dists < cut_off_distance * 5
+        if mask.any():
+            com_vel_x = np.sum(vels[mask, 0] * masses[mask]) / np.sum(masses[mask])
+            com_vel_y = np.sum(vels[mask, 1] * masses[mask]) / np.sum(masses[mask])
+            com_vel_z = np.sum(vels[mask, 2] * masses[mask]) / np.sum(masses[mask])
+            com_vel = np.array([com_vel_x, com_vel_y, com_vel_z])
+            vels_sub_5x[i] -= com_vel
+
+        # 0.5x
+        mask = dists < cut_off_distance * 0.5
+        if mask.any():
+            com_vel_x = np.sum(vels[mask, 0] * masses[mask]) / np.sum(masses[mask])
+            com_vel_y = np.sum(vels[mask, 1] * masses[mask]) / np.sum(masses[mask])
+            com_vel_z = np.sum(vels[mask, 2] * masses[mask]) / np.sum(masses[mask])
+            com_vel = np.array([com_vel_x, com_vel_y, com_vel_z])
+            vels_sub_0_5x[i] -= com_vel
+
+        # 0.1x
+        mask = dists < cut_off_distance * 0.1
+        if mask.any():
+            com_vel_x = np.sum(vels[mask, 0] * masses[mask]) / np.sum(masses[mask])
+            com_vel_y = np.sum(vels[mask, 1] * masses[mask]) / np.sum(masses[mask])
+            com_vel_z = np.sum(vels[mask, 2] * masses[mask]) / np.sum(masses[mask])
+            com_vel = np.array([com_vel_x, com_vel_y, com_vel_z])
+            vels_sub_0_1x[i] -= com_vel
+
+"""
