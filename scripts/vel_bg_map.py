@@ -59,11 +59,11 @@ def save_data(save_path, name, data, snapnum):
 
 #@njit(parallel=False)
 
-@njit(nopython=True)
+@njit(nopython=True, parallel=True)
 def compute_com_vel(coords, vels, masses, cut_off_distance):
     num_particles = len(coords)
     vels_sub_1x = vels.copy()
-    for i in range(num_particles):
+    for i in prange(num_particles):
         pos = coords[i]
         dist = np.empty(num_particles)
         total_mass = 0
@@ -95,7 +95,7 @@ def compute_com_vel(coords, vels, masses, cut_off_distance):
 
 
 
-def process_snapshot(params, snapnum, cut_off_distance):
+def process_snapshot(params, snapnum, cut_off_distance, save_path):
     #Start timer
     start = time.time()
 
@@ -114,6 +114,8 @@ def process_snapshot(params, snapnum, cut_off_distance):
     gal_quants0.add_key("Velocities", vels, 3)
     gal_quants0.add_key("SmoothingLength", hsml, 1)
     
+    print ("Galaxy quantities created", len(gal_quants0.data["Masses"]))
+
     vels_sub_1x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance)
     print ("1x done in ", time.time() - start)
     vels_sub_5x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance * 5)
@@ -124,10 +126,10 @@ def process_snapshot(params, snapnum, cut_off_distance):
     print ("0.1x done in ", time.time() - start)
 
 
-    save_data(params.save_path, "vels_sub_1x", vels_sub_1x, snapnum)
-    save_data(params.save_path, "vels_sub_5x", vels_sub_5x, snapnum)
-    save_data(params.save_path, "vels_sub_0_5x", vels_sub_0_5x, snapnum)
-    save_data(params.save_path, "vels_sub_0_1x", vels_sub_0_1x, snapnum)
+    save_data(save_path, "vels_sub_1x", vels_sub_1x, snapnum)
+    save_data(save_path, "vels_sub_5x", vels_sub_5x, snapnum)
+    save_data(save_path, "vels_sub_0_5x", vels_sub_0_5x, snapnum)
+    save_data(save_path, "vels_sub_0_1x", vels_sub_0_1x, snapnum)
 
     print("Time taken for this snapshot:", time.time() - start)
     
@@ -144,6 +146,7 @@ if __name__ == '__main__':
     sim = args['--sim']
     snapdir = args['--snapdir']
     save_path = path + sim + '/' + args['--save_path']
+    print ("save_path: ", save_path)
     image_box_size = float(args['--image_box_size'])
     snapnum_range = convert_to_array(args['--snapnum_range'], dtype=np.int32)
     cut_off_distance = 1.0
@@ -208,7 +211,7 @@ if __name__ == '__main__':
     print("Function compiled")
 
     for snapnum in range(snapnum_range[0], snapnum_range[1] + 1):
-        process_snapshot(params, snapnum, cut_off_distance)
+        process_snapshot(params, snapnum, cut_off_distance, save_path=save_path)
 
 
 """
