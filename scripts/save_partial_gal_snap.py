@@ -1,7 +1,6 @@
-
 #!/usr/bin/env python
 """
-vel_bg_map.py: "Create initial conditions file for FIRE+STARFORGE simulation 
+save_partial_gal_snap.py: "Create initial conditions file for FIRE+STARFORGE simulation 
                             with a refinement particle placed at a custom position.
                             The custom position is specified by the user. The script will
                             then choose particles within a certain distance of the custom
@@ -10,7 +9,7 @@ vel_bg_map.py: "Create initial conditions file for FIRE+STARFORGE simulation
                             deciding the original position for the refinement particle.
                             The script will then create an hdf5 file with the ICs."
 
-Usage: vel_bg_map.py [options]
+Usage: save_partial_gal_snap.py [options]
 
 Options:
     -h, --help                                          Show this screen
@@ -46,6 +45,8 @@ from docopt import docopt
 
 
 def save_data(save_path, name, data, snapnum):
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
     filename = save_path + name + "_snap" + str(snapnum) + ".npy"
     np.save(filename, data)
 
@@ -60,7 +61,7 @@ def process_snapshot(params, snapnum, save_path):
     coords = load_fire_data("Coordinates", 0, snapdir, snapnum)
     hsml = load_fire_data("SmoothingLength", 0, snapdir, snapnum)
     vels = load_fire_data("Velocities", 0, snapdir, snapnum)
-    temps = load_fire_data("Temperature", 0, snapdir, snapnum)
+    temps = load_fire_snap("Temperature", 0, snapdir, snapnum)
     pres = load_fire_data("Pressure", 0, snapdir, snapnum)
     dens = load_fire_data("Density", 0, snapdir, snapnum)
 
