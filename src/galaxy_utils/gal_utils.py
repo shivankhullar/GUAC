@@ -116,7 +116,7 @@ class GalQuants():
         self.data["Coordinates"] = np.array([proj_gas_coords_x,proj_gas_coords_y,proj_gas_coords_z]).T
         self.data["GalDist"] = np.take(gal_dist_proj, self.disk_inds)
 
-    def add_key(self, key, init_data, dim):
+    def add_key(self, key, init_data, dim, projection=True):
         if dim==1:    
             temp_data = np.take(init_data, self.sphere_inds)
             self.data[key] = np.take(temp_data, self.disk_inds)
@@ -131,19 +131,24 @@ class GalQuants():
             final_data_z = np.take(temp_data_z, self.disk_inds)
             final_data = np.array([final_data_x, final_data_y, final_data_z]).T
             #self.data[key] = np.array([final_data_x, final_data_y, final_data_z]).T
+            if projection:
+                print ("Starting projection...")
 
-            print ("Starting projection...")
-
-            proj_final_data = []
-            for i in range(0, len(final_data)):
-                proj_final_datum = np.matmul(self.proj, final_data[i])
-                proj_final_data.append(proj_final_datum)
-                #if i%5000==0:
-                    #print('Percent complete:', i/len(gas_coords)*100)
+                proj_final_data = []
+                for i in range(0, len(final_data)):
+                    proj_final_datum = np.matmul(self.proj, final_data[i])
+                    proj_final_data.append(proj_final_datum)
+                    #if i%5000==0:
+                        #print('Percent complete:', i/len(gas_coords)*100)
+                
+                self.data[key] = np.array(proj_final_data)
+                print ("Projection done...")
             
-            self.data[key] = np.array(proj_final_data)
-            print ("Projection done...")
-            
+            else:
+                self.data[key] = final_data
+    
+    def add_array(self, key, data):
+        self.data[key] = data
 
 
 
