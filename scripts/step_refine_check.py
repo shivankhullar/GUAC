@@ -13,7 +13,7 @@ Usage: step_refine_movie.py [options]
 
 Options:
     -h, --help                                          Show this screen
-    --snapdir=<snapdir>                                 Are snapshots in a snapdir directory? [default: True]
+    --snapdir=<snapdir>                                 Are snapshots in a snapdir or snapshot directory? [default: True]
     --threshold=<threshold>                             Threshold for cloud selection [default: 0.3]
     --path=<path>                                       Path to the simulation directory [default: ./]
     --sim=<sim>                                         Simulation name [default: m12i_final_fb_7k]
@@ -42,7 +42,7 @@ import os
 
 
 
-def get_snap_data_plotting(sim, sim_path, snap, snapshot_suffix=''):
+def get_snap_data_plotting(sim, sim_path, snap, snapshot_suffix='', snapdir=True):
 
     if snap<10:
         snapname = 'snapshot_'+snapshot_suffix+'00{num}'.format(num=snap) 
@@ -50,8 +50,12 @@ def get_snap_data_plotting(sim, sim_path, snap, snapshot_suffix=''):
         snapname = 'snapshot_'+snapshot_suffix+'0{num}'.format(num=snap)
     else:
         snapname = 'snapshot_'+snapshot_suffix+'{num}'.format(num=snap) 
-
-    filename = sim_path+sim+'/snapshots/'+snapname+'.hdf5'        
+    
+    if snapdir:
+        filename = sim_path+sim+'/snapshots/'+snapname+'.hdf5'        
+    else:
+        filename = sim_path+sim+'/'+snapname+'.hdf5'
+        
     print ("Reading file:", filename)
     F = h5py.File(filename,"r")
     pdata = {}
@@ -177,7 +181,7 @@ if __name__ == '__main__':
     args = docopt(__doc__)
     path = args['--path']
     sim = args['--sim']
-    snapdir = args['--snapdir']
+    snapdir = convert_to_bool(args['--snapdir'])
     save_path = path+sim+'/'+args['--save_path']
     image_box_size = float(args['--image_box_size'])
     snapnum_range = convert_to_array(args['--snapnum_range'], dtype=np.int32)
@@ -192,7 +196,7 @@ if __name__ == '__main__':
         print ("Snapshot number:", snap_num)
         snapshot_suffix = ''
         pdata, stardata, fire_stardata, refine_data, snapname = get_snap_data_plotting(sim, path, \
-                                                                    snap_num, snapshot_suffix=snapshot_suffix)
+                                                                    snap_num, snapshot_suffix=snapshot_suffix, snapdir=snapdir)
 
         inds = np.where(pdata["RefinementFlag"]==1)[0] 
         tagged_coords = pdata["Coordinates"][inds]
