@@ -20,6 +20,8 @@ Options:
     --save_path=<save_path>                             Path to save the images [default: ./]
     --image_box_size=<image_box_size>                   Size of the image box [default: 0.5]
     --snapnum_range=<snapnum_range>                     Range of snapshots to plot [default: 0,100]
+    --parallel=<parallel>                               Should the script execute in parallel? [default: False]
+    --num_cores=<num_cores>                             Number of processors to run on [default: 4]
 """
 
 from generic_utils.fire_utils import *
@@ -29,9 +31,11 @@ from cloud_utils.cloud_selection import *
 from generic_utils.script_utils import *
 
 from docopt import docopt
+import multiprocessing
 from meshoid import Meshoid
 import matplotlib
 import matplotlib.pyplot as plt
+matplotlib.use('Agg')
 from matplotlib.colors import LogNorm
 from matplotlib import colors
 import matplotlib.patches as mpatches
@@ -177,10 +181,38 @@ def plot_surf_dens(image_box_size, pdata, snap_num, com, gas_dists, save_path):
     plt.close()
 
 
+
+def process_snapshot(args):
+    snap_num, sim, path, snapshot_suffix, snapdir, save_path, image_box_size = args
+    pdata, stardata, fire_stardata, refine_data, snapname = get_snap_data_plotting(
+        sim, path, snap_num, snapshot_suffix=snapshot_suffix, snapdir=snapdir)
+
+    inds = np.where(pdata["RefinementFlag"] == 1)[0]
+    tagged_coords = pdata["Coordinates"][inds]
+    tagged_masses = pdata["Masses"][inds]
+
+    com_x = np.sum(tagged_coords[:, 0] * 1 / tagged_masses) / np.sum(1 / tagged_masses)
+    com_y = np.sum(tagged_coords[:, 1] * 1 / tagged_masses) / np.sum(1 / tagged_masses)
+    com_z = np.sum(tagged_coords[:, 2] * 1 / tagged_masses) / np.sum(1 / tagged_masses)
+
+    com = np.array([com_x, com_y, com_z])
+    gas_pos = pdata['Coordinates'] - com
+    gas_dists = np.linalg.norm(gas_pos, axis=1)
+
+    plot_dist_res(pdata, snap_num, gas_dists, save_path)
+    plot_surf_dens(image_box_size, pdata, snap_num, com, gas_dists, save_path)
+
+    print(f'Finished plotting for snapshot {snap_num}')
+
+
+
+
 if __name__ == '__main__':
     args = docopt(__doc__)
+    parallel = convert_to_bool(args['--parallel'])
     path = args['--path']
     sim = args['--sim']
+    num_cores = int(args['--num_cores'])
     snapdir = convert_to_bool(args['--snapdir'])
     save_path = path+sim+'/'+args['--save_path']
     image_box_size = float(args['--image_box_size'])
@@ -191,32 +223,14 @@ if __name__ == '__main__':
     #sim = 'orig_tag_test'
     #path = '/mnt/raid-project/murray/khullar/GMC_IC_Project/Sims/refinetag_test/'
     
-    for snap_num in range(snapnum_range[0], snapnum_range[1]+1):
-        print ("==============================================")
-        print ("Snapshot number:", snap_num)
-        snapshot_suffix = ''
-        pdata, stardata, fire_stardata, refine_data, snapname = get_snap_data_plotting(sim, path, \
-                                                                    snap_num, snapshot_suffix=snapshot_suffix, snapdir=snapdir)
+    
+    snap_args = [(snap_num, sim, path, '', snapdir, save_path, image_box_size) for snap_num in range(snapnum_range[0], snapnum_range[1] + 1)]
 
-        inds = np.where(pdata["RefinementFlag"]==1)[0] 
-        tagged_coords = pdata["Coordinates"][inds]
-        tagged_masses = pdata["Masses"][inds]
-
-        com_x = np.sum(tagged_coords[:,0]*1/tagged_masses)/np.sum(1/tagged_masses)
-        com_y = np.sum(tagged_coords[:,1]*1/tagged_masses)/np.sum(1/tagged_masses)
-        com_z = np.sum(tagged_coords[:,2]*1/tagged_masses)/np.sum(1/tagged_masses)
-
-        com = np.array([com_x, com_y, com_z])
-        gas_pos = pdata['Coordinates'] - com
-        gas_dists = np.linalg.norm(gas_pos, axis=1)
-
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-
-        
-        plot_dist_res(pdata, snap_num, gas_dists, save_path)
-
-        print ("Done with plotting distance vs mass")
-        plot_surf_dens(image_box_size, pdata, snap_num, com, gas_dists, save_path)
-
-        print(f'Finished plotting for snapshot {snap_num}')
+    if parallel:
+        pool = multiprocessing.Pool(processes=num_cores)
+        pool.map(process_snapshot, snap_args)
+        pool.close()
+        pool.join()
+    else:
+        for args in snap_args:
+            process_snapshot(args)
