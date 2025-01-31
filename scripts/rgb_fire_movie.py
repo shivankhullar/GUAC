@@ -152,8 +152,8 @@ def load_gal_quants_data(params, snapnum):
     pressure = load_fire_data("Pressure",0,snapdir,snapnum)
     dens = load_fire_data("Density",0,snapdir,snapnum)
     #temps = load_fire_data("Temperature",0,snapdir,snapnum)
-    sound_speed = load_fire_data("SoundSpeed",0,snapdir,snapnum)
-    molecular_mass_fraction = load_fire_data("MolecularMassFraction",0,snapdir,snapnum)
+    #sound_speed = load_fire_data("SoundSpeed",0,snapdir,snapnum)
+    #molecular_mass_fraction = load_fire_data("MolecularMassFraction",0,snapdir,snapnum)
     temps = load_fire_snap("Temperature", 0, snapdir, snapnum)
     print ("Loaded data...")
     
@@ -167,19 +167,19 @@ def load_gal_quants_data(params, snapnum):
     gal_quants0.add_key("SmoothingLength", hsml, 1)
     gal_quants0.add_key("Density", dens, 1)
     gal_quants0.add_key("Pressure", pressure, 1)
-    gal_quants0.add_key("SoundSpeed", sound_speed, 1)
-    gal_quants0.add_key("MolecularMassFraction", molecular_mass_fraction, 1)
+    #gal_quants0.add_key("SoundSpeed", sound_speed, 1)
+    #gal_quants0.add_key("MolecularMassFraction", molecular_mass_fraction, 1)
     gal_quants0.add_key("Temperature", temps, 1)
 
-    del masses, coords, hsml, pressure, dens, sound_speed, molecular_mass_fraction, temps
+    del masses, coords, hsml, pressure, dens, temps #sound_speed, molecular_mass_fraction, temps
     
     print ("Coords:", gal_quants0.data["Coordinates"].shape)
     print ("Masses:", gal_quants0.data["Masses"].shape)
     print ("SmoothingLength:", gal_quants0.data["SmoothingLength"].shape)
     print ("Density:", gal_quants0.data["Density"].shape)
     print ("Pressure:", gal_quants0.data["Pressure"].shape)
-    print ("SoundSpeed:", gal_quants0.data["SoundSpeed"].shape)
-    print ("MolecularMassFraction:", gal_quants0.data["MolecularMassFraction"].shape)
+    #print ("SoundSpeed:", gal_quants0.data["SoundSpeed"].shape)
+    #print ("MolecularMassFraction:", gal_quants0.data["MolecularMassFraction"].shape)
     print ("Temperature:", gal_quants0.data["Temperature"].shape)
 
 
