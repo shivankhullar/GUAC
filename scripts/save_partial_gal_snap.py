@@ -37,7 +37,6 @@ import time
 import glob
 #import yt
 import h5py
-a
 import numpy as np
 from docopt import docopt
 
