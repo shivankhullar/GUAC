@@ -116,20 +116,20 @@ def process_snapshot(params, snapnum, cut_off_distance, save_path):
     
     print ("Galaxy quantities created", len(gal_quants0.data["Masses"]))
 
-    vels_sub_1x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance)
+    #vels_sub_1x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance)
     print ("1x done in ", time.time() - start)
-    vels_sub_5x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance * 5)
+    #vels_sub_5x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance * 5)
     print ("5x done in ", time.time() - start)
     vels_sub_0_5x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance * 0.5)
     print ("0.5x done in ", time.time() - start)
-    vels_sub_0_1x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance * 0.1)
-    print ("0.1x done in ", time.time() - start)
+    #vels_sub_0_1x = compute_com_vel(gal_quants0.data["Coordinates"], gal_quants0.data["Velocities"], gal_quants0.data["Masses"], cut_off_distance * 0.1)
+    #print ("0.1x done in ", time.time() - start)
 
 
-    save_data(save_path, "vels_sub_1x", vels_sub_1x, snapnum)
-    save_data(save_path, "vels_sub_5x", vels_sub_5x, snapnum)
+    #save_data(save_path, "vels_sub_1x", vels_sub_1x, snapnum)
+    #save_data(save_path, "vels_sub_5x", vels_sub_5x, snapnum)
     save_data(save_path, "vels_sub_0_5x", vels_sub_0_5x, snapnum)
-    save_data(save_path, "vels_sub_0_1x", vels_sub_0_1x, snapnum)
+    #save_data(save_path, "vels_sub_0_1x", vels_sub_0_1x, snapnum)
 
     print("Time taken for this snapshot:", time.time() - start)
     
