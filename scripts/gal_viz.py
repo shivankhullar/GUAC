@@ -19,6 +19,7 @@ Options:
     --img_filename_prefix=<img_filename_prefix>         Prefix for image filename [default: center_proj_]
     --img_filename_suffix=<img_filename_suffix>         Suffix for image filename [default: .hdf5]
     --img_filename_mode=<img_filename_mode>             Mode for image filename [default: 0]
+    --image_box_size=<image_box_size>                   Size of the image box [default: 35]
     --center_and_proj=<center_and_proj>                 Find center and project galaxy [default: False]
 """
 
@@ -44,7 +45,7 @@ def make_photo(path, snapnum, save_path):
 
 
 
-def plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, res=1024, snapdir=True):
+def plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, image_box_size=35, res=1024, snapdir=True):
     try:
         key="gas"
         field="Masses"
@@ -82,8 +83,8 @@ def plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, res=1024, snapdi
                         gal_quants0.data["SmoothingLength"]#, gal_quants0.data["Velocities"]
 
     res = res
-    box_size = 50 #pdata['BoxSize']
-    image_box_size = 35#pdata['BoxSize']
+    #box_size = 50 #pdata['BoxSize']
+    #image_box_size = 35#pdata['BoxSize']
     center = gal_quants0.gal_centre_proj #np.array([box_size/2, box_size/2, box_size/2])
 
     M = Meshoid(pos, mass, hsml)
@@ -168,6 +169,7 @@ if __name__ == '__main__':
     image_filename_prefix = args['--img_filename_prefix']
     image_filename_suffix = args['--img_filename_suffix']
     img_filename_mode = int(args['--img_filename_mode'])
+    image_box_size=int(args['--image_box_size'])
 
     image_path = path+'img_data/'
 
@@ -225,4 +227,4 @@ if __name__ == '__main__':
                     image_path, image_filename_prefix,\
                     image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim, r_gal=r_gal, h=h)
 
-    plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, snapdir=snapdir)
+    plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, image_box_size=image_box_size, snapdir=snapdir)
