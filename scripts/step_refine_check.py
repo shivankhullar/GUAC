@@ -19,6 +19,7 @@ Options:
     --sim=<sim>                                         Simulation name [default: m12i_final_fb_7k]
     --save_path=<save_path>                             Path to save the images [default: ./]
     --image_box_size=<image_box_size>                   Size of the image box [default: 0.5]
+    --refinement_flag=<refinement_flag>                 Should the refinement flag be used? [default: False]
     --snapnum_range=<snapnum_range>                     Range of snapshots to plot [default: 0,100]
     --parallel=<parallel>                               Should the script execute in parallel? [default: False]
     --num_cores=<num_cores>                             Number of processors to run on [default: 4]
@@ -29,6 +30,7 @@ from cloud_utils.cloud_quants import *
 from cloud_utils.cloud_utils import *
 from cloud_utils.cloud_selection import *
 from generic_utils.script_utils import *
+from hybrid_sims_utils.read_snap import *
 
 from docopt import docopt
 import multiprocessing
@@ -45,66 +47,6 @@ import matplotlib.font_manager as fm
 import os
 
 
-
-def get_snap_data_plotting(sim, sim_path, snap, snapshot_suffix='', snapdir=True):
-
-    if snap<10:
-        snapname = 'snapshot_'+snapshot_suffix+'00{num}'.format(num=snap) 
-    elif snap>=10 and snap<100:
-        snapname = 'snapshot_'+snapshot_suffix+'0{num}'.format(num=snap)
-    else:
-        snapname = 'snapshot_'+snapshot_suffix+'{num}'.format(num=snap) 
-    
-    if snapdir:
-        filename = sim_path+sim+'/snapshots/'+snapname+'.hdf5'        
-    else:
-        filename = sim_path+sim+'/'+snapname+'.hdf5'
-        
-    print ("Reading file:", filename)
-    F = h5py.File(filename,"r")
-    pdata = {}
-    for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber":
-        pdata[field] = F["PartType0"][field][:]#[density_cut]
-
-    try:
-        pdata['RefinementFlag'] = F["PartType0"]['RefinementFlag'][:]
-    except:
-        pass
-
-    for key in F['Header'].attrs.keys():
-        pdata[key] = F['Header'].attrs[key]
-    
-    stardata = {}
-    if 'PartType5' in F.keys():
-        try:
-            for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber", "StellarFormationTime":
-                stardata[field] = F["PartType5"][field][:]#[density_cut]
-
-            for key in F['Header'].attrs.keys():
-                stardata[key] = F['Header'].attrs[key]
-        except:
-            print('No STARFORGE stars data in this snapshot')
-
-    fire_stardata = {}
-    if 'PartType4' in F.keys():
-        try:
-            for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber":
-                fire_stardata[field] = F["PartType4"][field][:]#[density_cut]
-
-            for key in F['Header'].attrs.keys():
-                fire_stardata[key] = F['Header'].attrs[key]
-        except:
-            print('No FIRE stars data in this snapshot')
-    refine_data = {}
-    if 'PartType3' in F.keys():
-        for field in "Masses", "Coordinates", "Velocities":
-            refine_data[field] = F["PartType3"][field][:]#[density_cut]
-
-    #refine_pos = np.array(F['PartType3/Coordinates'])
-    #refine_pos = refine_pos[0]
-    F.close()
-
-    return pdata, stardata, fire_stardata, refine_data, snapname
 
 
 def plot_dist_res(pdata, snap_num, gas_dists, save_path):
@@ -183,19 +125,24 @@ def plot_surf_dens(image_box_size, pdata, snap_num, com, gas_dists, save_path):
 
 
 def process_snapshot(args):
-    snap_num, sim, path, snapshot_suffix, snapdir, save_path, image_box_size = args
-    pdata, stardata, fire_stardata, refine_data, snapname = get_snap_data_plotting(
-        sim, path, snap_num, snapshot_suffix=snapshot_suffix, snapdir=snapdir)
+    snap_num, sim, path, snapshot_suffix, snapdir, save_path, image_box_size, refinement_tag = args
+    pdata, stardata, fire_stardata, refine_data, snapname = get_snap_data_hybrid(
+        sim, path, snap_num, snapshot_suffix=snapshot_suffix, snapdir=snapdir, refinement_tag=refinement_tag)
 
-    inds = np.where(pdata["RefinementFlag"] == 1)[0]
-    tagged_coords = pdata["Coordinates"][inds]
-    tagged_masses = pdata["Masses"][inds]
+    if refinement_tag:
+        inds = np.where(pdata["RefinementFlag"] == 1)[0]
+    #inds = np.where(pdata["RefinementFlag"] == 1)[0]
+        tagged_coords = pdata["Coordinates"][inds]
+        tagged_masses = pdata["Masses"][inds]
 
-    com_x = np.sum(tagged_coords[:, 0] * 1 / tagged_masses) / np.sum(1 / tagged_masses)
-    com_y = np.sum(tagged_coords[:, 1] * 1 / tagged_masses) / np.sum(1 / tagged_masses)
-    com_z = np.sum(tagged_coords[:, 2] * 1 / tagged_masses) / np.sum(1 / tagged_masses)
+        com_x = np.sum(tagged_coords[:, 0] * 1 / tagged_masses) / np.sum(1 / tagged_masses)
+        com_y = np.sum(tagged_coords[:, 1] * 1 / tagged_masses) / np.sum(1 / tagged_masses)
+        com_z = np.sum(tagged_coords[:, 2] * 1 / tagged_masses) / np.sum(1 / tagged_masses)
 
-    com = np.array([com_x, com_y, com_z])
+        com = np.array([com_x, com_y, com_z])
+    else:
+        com = np.array([pdata['BoxSize']/2, pdata['BoxSize']/2, pdata['BoxSize']/2])
+        
     gas_pos = pdata['Coordinates'] - com
     gas_dists = np.linalg.norm(gas_pos, axis=1)
 
@@ -216,6 +163,7 @@ if __name__ == '__main__':
     snapdir = convert_to_bool(args['--snapdir'])
     save_path = path+sim+'/'+args['--save_path']
     image_box_size = float(args['--image_box_size'])
+    refinement_tag = convert_to_bool(args['--refinement_flag'])
     snapnum_range = convert_to_array(args['--snapnum_range'], dtype=np.int32)
     print (save_path)
     #sim = 'gas_pID_test'
@@ -224,7 +172,7 @@ if __name__ == '__main__':
     #path = '/mnt/raid-project/murray/khullar/GMC_IC_Project/Sims/refinetag_test/'
     
     
-    snap_args = [(snap_num, sim, path, '', snapdir, save_path, image_box_size) for snap_num in range(snapnum_range[0], snapnum_range[1] + 1)]
+    snap_args = [(snap_num, sim, path, '', snapdir, save_path, image_box_size, refinement_tag) for snap_num in range(snapnum_range[0], snapnum_range[1] + 1)]
 
     if parallel:
         pool = multiprocessing.Pool(processes=num_cores)
