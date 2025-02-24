@@ -5,9 +5,12 @@ Author: Shivan Khullar
 Date: Feb 2025
 
 """
+import h5py
+#from galaxy_utils.gal_utils import *
 
 
-def get_snap_data_plotting(sim, sim_path, snap, snapshot_suffix='', refinement_tag=True):
+
+def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, refinement_tag=False):
 
     if snap<10:
         snapname = 'snapshot_'+snapshot_suffix+'00{num}'.format(num=snap) 
@@ -15,8 +18,12 @@ def get_snap_data_plotting(sim, sim_path, snap, snapshot_suffix='', refinement_t
         snapname = 'snapshot_'+snapshot_suffix+'0{num}'.format(num=snap)
     else:
         snapname = 'snapshot_'+snapshot_suffix+'{num}'.format(num=snap) 
+    
+    if snapdir:
+        filename = sim_path+sim+'/snapshots/'+snapname+'.hdf5'        
+    else:
+        filename = sim_path+sim+'/'+snapname+'.hdf5'
 
-    filename = sim_path+sim+'/snapshots/'+snapname+'.hdf5'        
     print ("Reading file:", filename)
     F = h5py.File(filename,"r")
     pdata = {}
