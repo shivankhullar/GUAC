@@ -63,6 +63,9 @@ def process_snapshot(params, snapnum, save_path):
     temps = load_fire_snap("Temperature", 0, snapdir, snapnum)
     pres = load_fire_data("Pressure", 0, snapdir, snapnum)
     dens = load_fire_data("Density", 0, snapdir, snapnum)
+    pIDs = load_fire_data("ParticleIDs", 0, snapdir, snapnum)
+    pIDgen = load_fire_data("ParticleIDGenerationNumber", 0, snapdir, snapnum)
+    pIDchilds = load_fire_data("ParticleChildIDsNumber", 0, snapdir, snapnum)
 
     print("Data loaded")
     
@@ -74,13 +77,16 @@ def process_snapshot(params, snapnum, save_path):
     gal_quants0.add_key("Temperature", temps, 1)
     gal_quants0.add_key("Pressure", pres, 1)
     gal_quants0.add_key("Density", dens, 1)
+    gal_quants0.add_key("ParticleIDs", pIDs, 1)
+    gal_quants0.add_key("ParticleIDGenerationNumber", pIDgen, 1)
+    gal_quants0.add_key("ParticleChildIDsNumber", pIDchilds, 1)
 
     
     print ("Galaxy quantities created", len(gal_quants0.data["Masses"]))
     save_data(save_path, "gal_quants0", gal_quants0, snapnum)
     print("Time taken for this snapshot:", time.time() - start)
     
-    del masses, coords, hsml, vels
+    del masses, coords, hsml, vels, dens, temps, pres, pIDs, pIDgen, pIDchilds
 
     return
 
