@@ -47,13 +47,13 @@ class Params():
     """
     def __init__(self, path = "../../FIRE/m12i_res7100/", nmin = 10, vir = 2, \
                     sub_dir = "CloudTrackerData/n{nmin}_alpha{vir}/".format(nmin=10, vir=2), \
-                    start_snap = 590, last_snap = 600, filename_prefix="Linked_Clouds_", cloud_num_digits = 3, \
+                    start_snap = 590, last_snap = 600, filename_prefix="Linked_Clouds_", cloud_num_digits = 4, \
                     snapshot_num_digits = 3, cloud_prefix = "Cloud", snapshot_prefix="Snap", age_cut=1, \
                     dat_file_header_size=8, gas_data_sub_dir = 'GasData/', star_data_sub_dir = "StarData/", \
-                    cph_sub_dir="CloudPhinderData/", image_path="../Paper/VizImages/m12i_res7100/img_data/", \
-                    img_fname_pre='image_faceon_s0', img_fname_suf='_fov0035_Ngb32_star.hdf5', \
+                    cph_sub_dir="CloudPhinderData/", image_path="img_data/", \
+                    img_fname_prefix='center_proj_', img_fname_suffix='.hdf5', \
                     hdf5_file_prefix = 'Clouds_', frac_thresh='thresh0.0', sim='m12i_final_fb_57k', \
-                    r_gal=25, h=0.4):
+                    r_gal=25, h=0.4,  gal_quants_sub_dir='gal_quants/', vels_sub_dir='vel_sub/', phinder_sub_dir="VoidPhinderData/"):
 
         self.sim=sim
         self.path=path+sim+'/'
@@ -62,7 +62,7 @@ class Params():
         self.sub_dir = sub_dir
         self.start_snap = start_snap
         self.last_snap = last_snap
-        self.filename_prefix = filename_prefix+"n{nmin}_alpha{vir}_".format(nmin=nmin, vir=vir)
+        self.filename_prefix = filename_prefix#+"n{nmin}_alpha{vir}_".format(nmin=nmin, vir=vir)
         self.cloud_num_digits=cloud_num_digits
         self.snapshot_num_digits=snapshot_num_digits
         self.cloud_prefix=cloud_prefix
@@ -72,13 +72,16 @@ class Params():
         self.star_data_sub_dir=star_data_sub_dir
         self.cph_sub_dir=cph_sub_dir+"n{nmin}_alpha{vir}/".format(nmin=nmin, vir=vir)
         self.image_path=self.path+image_path
-        self.image_filename_prefix=img_fname_pre
-        self.image_filename_suffix=img_fname_suf
+        self.image_filename_prefix=img_fname_prefix
+        self.image_filename_suffix=img_fname_suffix
         self.hdf5_file_prefix = hdf5_file_prefix
         self.frac_thresh = frac_thresh
         self.gas_data_sub_dir = gas_data_sub_dir
         self.r_gal = r_gal
         self.h = h
+        self.gal_quants_sub_dir = gal_quants_sub_dir
+        self.vels_sub_dir = vels_sub_dir
+        self.phinder_sub_dir = phinder_sub_dir
   
 
 def load_fire_data_arr(key, field, snapnum, params):
