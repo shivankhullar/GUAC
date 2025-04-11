@@ -152,11 +152,22 @@ class GalQuants():
 
 
 
-def load_gal_quants(params, snapnum):
-    gal_quants0 = np.load(params.path+params.gal_quants_sub_dir+'gal_quants0_snap'+str(snapnum)+'.npy', allow_pickle=True).item()
+def load_gal_quants(params, snapnum, particle_type=0):
+    gal_quants0 = np.load(params.path+params.gal_quants_sub_dir+f'gal_quants{particle_type}_snap'+str(snapnum)+'.npy', allow_pickle=True).item()
     return gal_quants0
 
-
+def load_vel_sub(snapnum, params, multiple=1):
+    if multiple == 1:
+        vel_sub = np.load(params.path+params.vels_sub_dir+"vels_sub_1x_snap"+str(snapnum)+".npy")
+    elif multiple == 5:
+        vel_sub = np.load(params.path+params.vels_sub_dir+"vels_sub_5x_snap"+str(snapnum)+".npy")
+    elif multiple == 0.1:
+        vel_sub = np.load(params.path+params.vels_sub_dir+"vels_sub_0_1x_snap"+str(snapnum)+".npy")
+    elif multiple == 0.5:
+        vel_sub = np.load(params.path+params.vels_sub_dir+"vels_sub_0_5x_snap"+str(snapnum)+".npy")
+    else:
+        print ("Invalid multiple")
+    return vel_sub
 
 
 def get_vc(gal_quants0, gal_quants1, gal_quants4, r_gals):

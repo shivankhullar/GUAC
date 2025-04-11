@@ -20,6 +20,7 @@ Options:
     --image_box_size=<image_box_size>                   Size of the image box [default: 15]
     --snapnum_range=<snapnum_range>                     Range of snapshots to plot [default: 0,100]
     --res=<res>                                         Resolution of the image [default: 2048]
+    --particle_type=<particle_type>                     Particle type to plot [default: 0]
 """
 
 
@@ -50,44 +51,69 @@ def save_data(save_path, name, data, snapnum):
     np.save(filename, data)
 
 
-def process_snapshot(params, snapnum, save_path):
+def process_snapshot(params, snapnum, save_path, particle_type=0):
     start = time.time()
 
     print("Processing snapshot:", snapnum)
     snapdir = params.path
     print ("snapdir: ", snapdir)
-    masses = load_fire_data("Masses", 0, snapdir, snapnum)
-    coords = load_fire_data("Coordinates", 0, snapdir, snapnum)
-    hsml = load_fire_data("SmoothingLength", 0, snapdir, snapnum)
-    vels = load_fire_data("Velocities", 0, snapdir, snapnum)
-    temps = load_fire_snap("Temperature", 0, snapdir, snapnum)
-    pres = load_fire_data("Pressure", 0, snapdir, snapnum)
-    dens = load_fire_data("Density", 0, snapdir, snapnum)
-    pIDs = load_fire_data("ParticleIDs", 0, snapdir, snapnum)
-    pIDgen = load_fire_data("ParticleIDGenerationNumber", 0, snapdir, snapnum)
-    pIDchilds = load_fire_data("ParticleChildIDsNumber", 0, snapdir, snapnum)
+    if particle_type==0:
+        masses = load_fire_data("Masses", particle_type, snapdir, snapnum)
+        coords = load_fire_data("Coordinates", particle_type, snapdir, snapnum)
+        hsml = load_fire_data("SmoothingLength", particle_type, snapdir, snapnum)
+        vels = load_fire_data("Velocities", particle_type, snapdir, snapnum)
+        temps = load_fire_snap("Temperature", particle_type, snapdir, snapnum)
+        pres = load_fire_data("Pressure", particle_type, snapdir, snapnum)
+        dens = load_fire_data("Density", particle_type, snapdir, snapnum)
+        pIDs = load_fire_data("ParticleIDs", particle_type, snapdir, snapnum)
+        pIDgen = load_fire_data("ParticleIDGenerationNumber", particle_type, snapdir, snapnum)
+        pIDchilds = load_fire_data("ParticleChildIDsNumber", particle_type, snapdir, snapnum)
 
-    print("Data loaded")
-    
-    gal_quants0 = GalQuants(params, snapnum, r_gal, h)
-    gal_quants0.project(coords)
-    gal_quants0.add_key("Masses", masses, 1)
-    gal_quants0.add_key("Velocities", vels, 3)
-    gal_quants0.add_key("SmoothingLength", hsml, 1)
-    gal_quants0.add_key("Temperature", temps, 1)
-    gal_quants0.add_key("Pressure", pres, 1)
-    gal_quants0.add_key("Density", dens, 1)
-    gal_quants0.add_key("ParticleIDs", pIDs, 1)
-    gal_quants0.add_key("ParticleIDGenerationNumber", pIDgen, 1)
-    gal_quants0.add_key("ParticleChildIDsNumber", pIDchilds, 1)
+        print("Data loaded")
+        
+        gal_quants0 = GalQuants(params, snapnum, r_gal, h)
+        gal_quants0.project(coords)
+        gal_quants0.add_key("Masses", masses, 1)
+        gal_quants0.add_key("Velocities", vels, 3)
+        gal_quants0.add_key("SmoothingLength", hsml, 1)
+        gal_quants0.add_key("Temperature", temps, 1)
+        gal_quants0.add_key("Pressure", pres, 1)
+        gal_quants0.add_key("Density", dens, 1)
+        gal_quants0.add_key("ParticleIDs", pIDs, 1)
+        gal_quants0.add_key("ParticleIDGenerationNumber", pIDgen, 1)
+        gal_quants0.add_key("ParticleChildIDsNumber", pIDchilds, 1)
 
     
-    print ("Galaxy quantities created", len(gal_quants0.data["Masses"]))
-    save_data(save_path, "gal_quants0", gal_quants0, snapnum)
+        print ("Galaxy quantities created", len(gal_quants0.data["Masses"]))
+        save_data(save_path, f"gal_quants{particle_type}", gal_quants0, snapnum)
+        del masses, coords, hsml, vels, dens, temps, pres, pIDs, pIDgen, pIDchilds
+
+    if particle_type==4:
+        masses = load_fire_data("Masses", particle_type, snapdir, snapnum)
+        coords = load_fire_data("Coordinates", particle_type, snapdir, snapnum)
+        vels = load_fire_data("Velocities", particle_type, snapdir, snapnum)
+        pIDs = load_fire_data("ParticleIDs", particle_type, snapdir, snapnum)
+        pIDgen = load_fire_data("ParticleIDGenerationNumber", particle_type, snapdir, snapnum)
+        pIDchilds = load_fire_data("ParticleChildIDsNumber", particle_type, snapdir, snapnum)
+        sft = load_fire_data("StellarFormationTime", particle_type, snapdir, snapnum)
+
+        print("Data loaded")
+        
+        gal_quants4 = GalQuants(params, snapnum, r_gal, h)
+        gal_quants4.project(coords)
+        gal_quants4.add_key("Masses", masses, 1)
+        gal_quants4.add_key("Velocities", vels, 3)
+        gal_quants4.add_key("StellarFormationTime", sft, 1)
+        gal_quants4.add_key("ParticleIDs", pIDs, 1)
+        gal_quants4.add_key("ParticleIDGenerationNumber", pIDgen, 1)
+        gal_quants4.add_key("ParticleChildIDsNumber", pIDchilds, 1)
+
+        print ("Galaxy quantities created", len(gal_quants4.data["Masses"]))
+        save_data(save_path, f"gal_quants{particle_type}", gal_quants4, snapnum)
+        del masses, coords, vels, pIDs, pIDgen, pIDchilds, sft
+
     print("Time taken for this snapshot:", time.time() - start)
     
-    del masses, coords, hsml, vels, dens, temps, pres, pIDs, pIDgen, pIDchilds
-
     return
 
 
@@ -102,6 +128,7 @@ if __name__ == '__main__':
     print ("save_path: ", save_path)
     image_box_size = float(args['--image_box_size'])
     snapnum_range = convert_to_array(args['--snapnum_range'], dtype=np.int32)
+    part_type = int(args['--particle_type'])
     cut_off_distance = 1.0
 
     start_snap = snapnum_range[0]
@@ -143,14 +170,24 @@ if __name__ == '__main__':
 
 
     
-    params = Params(path, nmin, vir, sub_dir, start_snap, last_snap, filename_prefix, cloud_num_digits, \
-                    snapshot_num_digits, cloud_prefix, snapshot_prefix, age_cut, \
-                    dat_file_header_size, gas_data_sub_dir, star_data_sub_dir, cph_sub_dir,\
-                    image_path, image_filename_prefix,\
-                    image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim, r_gal=r_gal, h=h)
-        
+    #params = Params(path, nmin, vir, sub_dir, start_snap, last_snap, filename_prefix, cloud_num_digits, \
+    #                snapshot_num_digits, cloud_prefix, snapshot_prefix, age_cut, \
+    #                dat_file_header_size, gas_data_sub_dir, star_data_sub_dir, cph_sub_dir,\
+    #                image_path, image_filename_prefix,\
+    #                image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim, r_gal=r_gal, h=h)
+    vels_sub_dir = 'vel_sub/'
+    gal_quants_sub_dir = 'gal_quants/'
+    phinder_sub_dir="VoidPhinderData/"
+    linked_filename_prefix = "Linked_Voids_"
+
+
+
+    params = Params(path=path, sub_dir=sub_dir, start_snap=start_snap, last_snap=last_snap, filename_prefix=linked_filename_prefix, \
+                    cloud_prefix=cloud_prefix, hdf5_file_prefix=hdf5_file_prefix, frac_thresh=frac_thresh, sim=sim, r_gal=r_gal, h=h,\
+                    gal_quants_sub_dir=gal_quants_sub_dir, vels_sub_dir=vels_sub_dir, phinder_sub_dir=phinder_sub_dir)
+    
 
 
     for snapnum in range(snapnum_range[0], snapnum_range[1] + 1):
-        process_snapshot(params, snapnum, save_path=save_path)
+        process_snapshot(params, snapnum, save_path=save_path, particle_type=part_type)
 

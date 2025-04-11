@@ -23,6 +23,62 @@ def read_linked_voids_file(filename):
 
 
 
+
+def get_all_voids_data_hdf5(snap_num, params, contour_only=False):
+    """
+    This is a function to get the quantities of a void from the hdf5 file.
+    Inputs:
+    void_num: int
+    snap_num: int
+    params: Params object
+
+    Outputs:
+    void_data: dict
+    """
+    hdf5_file_name = params.path+params.sub_dir+'/'+params.phinder_sub_dir+params.hdf5_file_prefix+str(snap_num)+'.hdf5'
+
+    f = h5py.File(hdf5_file_name, 'r')
+    contour_list = []
+    void_data_list = []
+    for key in f.keys():
+        #if key.startswith('Void'):
+        void_name = key
+        #    break
+
+        #void_name = get_cloud_name(void_num, params)
+        g = f[void_name]
+        
+        void_data = {}
+        void_data['Name'] = void_name
+        void_data['Contour'] = np.array(g['Contour'][:])
+
+        
+        if contour_only:
+            contour_list.append(void_data['Contour'])
+            #return void_data
+        
+        else:
+            h = g['PartType0']        
+            void_data['PartType0'] = {}
+            void_data['PartType0']['Coordinates'] = np.array(h['Coordinates'])
+            void_data['PartType0']['Velocities'] = np.array(h['Velocities'])
+            void_data['PartType0']['Masses'] = np.array(h['Masses'])
+            void_data['PartType0']['SmoothingLength'] = np.array(h['SmoothingLength'])
+            void_data['PartType0']['Density'] = np.array(h['Density'])
+            void_data['PartType0']['Temperature'] = np.array(h['Temperature'])
+            void_data['PartType0']['Pressure'] = np.array(h['Pressure'])
+            void_data['PartType0']['ParticleIDs'] = np.array(h['ParticleIDs'])
+            void_data['PartType0']['ParticleIDGenerationNumber'] = np.array(h['ParticleIDGenerationNumber'])
+            void_data['PartType0']['ParticleChildIDsNumber'] = np.array(h['ParticleChildIDsNumber'])
+            #return void_data
+            void_data_list.append(void_data)
+        
+    if contour_only:
+        return contour_list
+    else:
+        return void_data_list
+
+
 def get_void_data_hdf5(void_num, snap_num, params, contour_only=False):
     """
     This is a function to get the quantities of a void from the hdf5 file.
