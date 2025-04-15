@@ -63,6 +63,8 @@ def process_snapshot(params, snapnum, save_path, particle_type=0):
         hsml = load_fire_data("SmoothingLength", particle_type, snapdir, snapnum)
         vels = load_fire_data("Velocities", particle_type, snapdir, snapnum)
         temps = load_fire_snap("Temperature", particle_type, snapdir, snapnum)
+        int_energy = load_fire_snap("InternalEnergy", particle_type, snapdir, snapnum)
+        
         pres = load_fire_data("Pressure", particle_type, snapdir, snapnum)
         dens = load_fire_data("Density", particle_type, snapdir, snapnum)
         pIDs = load_fire_data("ParticleIDs", particle_type, snapdir, snapnum)
@@ -77,16 +79,22 @@ def process_snapshot(params, snapnum, save_path, particle_type=0):
         gal_quants0.add_key("Velocities", vels, 3)
         gal_quants0.add_key("SmoothingLength", hsml, 1)
         gal_quants0.add_key("Temperature", temps, 1)
+        gal_quants0.add_key("InternalEnergy", int_energy, 1)
         gal_quants0.add_key("Pressure", pres, 1)
         gal_quants0.add_key("Density", dens, 1)
         gal_quants0.add_key("ParticleIDs", pIDs, 1)
         gal_quants0.add_key("ParticleIDGenerationNumber", pIDgen, 1)
         gal_quants0.add_key("ParticleChildIDsNumber", pIDchilds, 1)
 
+        try:
+            sound_speed = load_fire_snap("SoundSpeed", particle_type, snapdir, snapnum)
+            gal_quants0.add_key("SoundSpeed", sound_speed, 1)
+        except:
+            pass
     
         print ("Galaxy quantities created", len(gal_quants0.data["Masses"]))
         save_data(save_path, f"gal_quants{particle_type}", gal_quants0, snapnum)
-        del masses, coords, hsml, vels, dens, temps, pres, pIDs, pIDgen, pIDchilds
+        del masses, coords, hsml, vels, dens, temps, pres, pIDs, pIDgen, pIDchilds, int_energy
 
     if particle_type==4:
         masses = load_fire_data("Masses", particle_type, snapdir, snapnum)
