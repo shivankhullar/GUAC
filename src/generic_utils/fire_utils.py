@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import load_from_snapshot
 import generic_utils.constants
+from galaxy_utils.gal_utils import *
 
 class Params():
     """
@@ -289,7 +290,7 @@ def get_cloud_name(cloud_num, params):
     
 
 
-def get_snap_data(params, snap_num, cosmo=False):
+def get_snap_data(params, snap_num, gal_quants=True, cosmo=False):
     """
     Load the snapshot data for the given snapshot number.
 
@@ -305,6 +306,57 @@ def get_snap_data(params, snap_num, cosmo=False):
     """
     snap_data = dict()
     print ('Loading snap data for snapshot:', snap_num, params.sim)
+
+    if gal_quants==True:
+        gal_quants0 = load_gal_quants(params, snap_num, 0)
+        gal_quants4 = load_gal_quants(params, snap_num, 4)
+
+        snap_data['dens'] = gal_quants0.data["Density"]
+        snap_data['coords'] = gal_quants0.data["Coordinates"]
+        snap_data['masses'] = gal_quants0.data["Masses"]
+        snap_data['temps'] = gal_quants0.data["Temperature"]
+        
+        weights = get_temperature(int_energy, z_he, n_elec, z_tot, dens, f_neutral=f_neutral, f_molec=f_molec, key='Weight')
+        
+        m_p = 1.67e-24          # mass of proton (g)
+        k_B = 1.38e-16          # Boltzmann constant (erg/K)
+        cs = np.sqrt(k_B*gal_quants0.data["Temperature"]/(weights*m_p))/(1e5)  # in km/s
+        
+        snap_data['cs'] = cs
+        snap_data['vels'] = vels
+        snap_data['hsml'] = hsml
+        snap_data['pIDs'] = pIDs
+        snap_data['int_energy'] = int_energy
+        if cosmo==True:
+            snap_data['time'] = time
+        else:
+            snap_data['time'] = 0
+
+
+        # Now do the same for star data
+        if cosmo==True:
+            star_coords = load_from_snapshot.load_from_snapshot('Coordinates', 4, snapdir, snap_num, units_to_physical=False)
+            star_masses = load_from_snapshot.load_from_snapshot('Masses', 4, snapdir, snap_num, units_to_physical=False)
+            star_vels = load_from_snapshot.load_from_snapshot('Velocities', 4, snapdir, snap_num, units_to_physical=False)
+            sfts = load_from_snapshot.load_from_snapshot('StellarFormationTime', 4, snapdir, snap_num, units_to_physical=False)
+            star_pIDs = load_from_snapshot.load_from_snapshot('ParticleIDs', 4, snapdir, snap_num, units_to_physical=False)
+        else:
+            star_coords = load_fire_data_arr('star', 'coords', snap_num, params)
+            star_masses = load_fire_data_arr('star', 'masses', snap_num, params)
+            star_ages = load_fire_data_arr('star', 'ages', snap_num, params)
+            star_pIDs = load_fire_data('ParticleIDs', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            star_vels = load_fire_data('Velocities', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            sfts = load_fire_data('StellarFormationTime', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+
+        snap_data['star_coords'] = star_coords
+        snap_data['star_masses'] = star_masses
+        if not cosmo: snap_data['star_ages'] = star_ages
+        snap_data['star_pIDs'] = star_pIDs
+        snap_data['star_vels'] = star_vels
+        snap_data['sfts'] = sfts
+
+        
+        return snap_data
 
     if cosmo==True:
         print ('All data being returned is in cosmological units.')
