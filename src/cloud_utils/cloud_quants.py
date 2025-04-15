@@ -399,14 +399,14 @@ def get_cloud_pop_data(params, snapnum, nmin, vir, mw_cut=False):
     """
     cloud_total_masses, cloud_reffs, cloud_centress, cloud_hmrads, \
         cloud_num_parts, cloud_virs, z_dists, r_gal_dists, cloud_nums = \
-    read_cloud_summary_data(params.path, snapnum, nmin, vir, params, params.r_gal, params.h, \
+    read_cloud_summary_data(params, snapnum, params.r_gal, params.h, \
                             MW_cut=mw_cut)
     cloud_pop_data = CloudPopData(cloud_total_masses, cloud_reffs, cloud_centress, \
                                   cloud_hmrads, cloud_num_parts, cloud_virs, z_dists, r_gal_dists, cloud_nums)
     return cloud_pop_data
 
 
-def read_cloud_summary_data(path, snapnum, nmin, vir, params, r_gal, h, MW_cut=False):
+def read_cloud_summary_data(params, snapnum, r_gal, h, MW_cut=False):
     """ 
     Function to read the cloud summary data for a snapshot.
 
@@ -432,8 +432,8 @@ def read_cloud_summary_data(path, snapnum, nmin, vir, params, r_gal, h, MW_cut=F
     """
     #r_gal = 25
     #h = 3
-    path = path+'CloudPhinderData/n{nmin}_alpha{vir}/'.format(nmin=nmin, vir=vir)
-    filename = 'bound_{snap_num}_n{nmin}_alpha{vir}.dat'.format(snap_num = snapnum, nmin = nmin, vir=vir)
+    path = params.path+'CloudPhinderData/n{nmin}_alpha{vir}/'.format(nmin=params.nmin, vir=params.vir)
+    filename = 'bound_{snap_num}_n{nmin}_alpha{vir}.dat'.format(snap_num = snapnum, nmin = params.nmin, vir=params.vir)
     datContent = [i.strip().split() for i in open(path+filename).readlines()]
     
     cloud_total_mass_list = []
@@ -447,8 +447,8 @@ def read_cloud_summary_data(path, snapnum, nmin, vir, params, r_gal, h, MW_cut=F
     cloud_nums = []
 
     for i in range (0, len(datContent)):
-        j = i-8
-        if (i<8):
+        j = i-params.dat_file_header_size
+        if (i<params.dat_file_header_size):
             continue
         cloud_total_mass = float(datContent[i][0])
         cloud_centre_x = float(datContent[i][1])
