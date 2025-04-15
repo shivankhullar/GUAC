@@ -124,7 +124,7 @@ if __name__ == '__main__':
     path = args['--path']
     sim = args['--sim']
     snapdir = args['--snapdir']
-    save_path = path + sim + '/' + args['--save_path']
+    save_path = args['--save_path'] #path + sim + '/' + args['--save_path']
     print ("save_path: ", save_path)
     image_box_size = float(args['--image_box_size'])
     snapnum_range = convert_to_array(args['--snapnum_range'], dtype=np.int32)
