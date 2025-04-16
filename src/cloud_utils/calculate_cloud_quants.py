@@ -208,9 +208,15 @@ def get_cloud_pop_quant_info(cloud_inds, snapnum, params, cloud_pop_data, get_fr
                                             snap_data=snap_data, star_data=True)
         else:
             # We won't calculate quantities using all the particles in the cloud box
-            dens, vels, coords, masses, hsml, cs, temps, star_coords, star_masses = get_cloud_quants(cloud_num, snapnum, \
+            if snap_data is not None:
+                dens, vels, coords, masses, hsml, cs, temps, star_coords, star_masses = get_cloud_quants(cloud_num, snapnum, \
+                                                    params, cloud_reff_factor=2, cloud_box=False,\
+                                                        snap_data=snap_data, star_data=True, pID_mode=True)
+            else:
+                        dens, vels, coords, masses, hsml, cs, temps, star_coords, star_masses = get_cloud_quants(cloud_num, snapnum, \
                                                     params, cloud_reff_factor=2, cloud_box=False,\
                                                         snap_data=None, star_data=True)
+
 
         volumes = masses/dens
         #assert np.sum(masses)==cloud_pop_data.cloud_total_masses[cloud_num]

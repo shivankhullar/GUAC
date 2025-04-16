@@ -17,7 +17,33 @@ import scipy
 ########################### Getting cloud quantities   #################################
 ########################################################################################
 
+def get_cloud_quants_hdf5_pIDs(cloud_num, snap_num, params):
+    """
+    This is a function to get the particle IDs of a cloud from the hdf5 file.
+    Inputs:
+        cloud_num: the cloud number
+        snap_num: the snapshot number
+        params: the parameters (see src/fire_utils.py)
+    Outputs:
+        pID_array: the particle IDs, gen_nums and childIDs of the particles in the cloud
+    """
+    file_name = params.path+params.cph_sub_dir+params.hdf5_file_prefix+str(snap_num)+\
+                '_n{nmin}_alpha{vir}'.format(nmin=params.nmin, vir=params.vir)+'.hdf5'
+    f = h5py.File(file_name, 'r')
+    cloud_name = get_cloud_name(cloud_num, params)
+    g = f[cloud_name]
+    
+    h = g['PartType0']
+    pIDs = np.array(h['ParticleIDs'])
+    gen_nums = np.array(h['ParticleIDGenerationNumber'])
+    childIDs = np.array(h['ParticleChildIDsNumber'])
+    pID_array = np.array([pIDs, gen_nums, childIDs]).T
+    dens = np.array(h['Density'])
+    #snap_data['pIDs'] = gal_quants0.data["ParticleIDs"]
+    #snap_data['pIDgennum'] = gal_quants0.data["ParticleIDGenerationNumber"]
+    #snap_data['pIDchilds'] = gal_quants0.data["ParticleChildIDsNumber"]
 
+    return pID_array, dens
 
 
 def get_cloud_quants_hdf5(cloud_num, snap_num, params):
@@ -169,7 +195,7 @@ def get_cloud_box(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_box=
 
 
 def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_box=None, \
-                     snap_data=None, project=False, center_wrt_galaxy=False, star_data=True):
+                     snap_data=None, project=False, center_wrt_galaxy=False, star_data=True, pID_mode=False):
     """ 
     Function to get the quantities of a cloud.
 
@@ -220,7 +246,36 @@ def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_b
     #print ('Loading particle data...')
     if mode == 'cloud':
         # Load the particle data
-        dens, vels, coords, masses, hsml, cs, temps = get_cloud_quants_hdf5(cloud_num, snap_num, params)
+        if pID_mode:
+            pID_array, dens1 = get_cloud_quants_hdf5_pIDs(cloud_num, snap_num, params)
+            # We will match the pIDs with the snapshot data
+            if snap_data:
+                snap_data_pID_array = np.array([snap_data['pIDs'], snap_data['pIDgennum'], snap_data['pIDchilds']]).T
+                # Find rows where all 3 columns match
+                A = snap_data_pID_array
+                B = pID_array
+                # Convert rows to tuples for set comparison
+                set_B = set(map(tuple, B))
+
+                # Get indices in A where row exists in B
+                matching_indices = [i for i, row in enumerate(A) if tuple(row) in set_B]
+                
+                dens = snap_data['dens'][matching_indices]
+                vels = snap_data['vels'][matching_indices]
+                coords = snap_data['coords'][matching_indices]
+                masses = snap_data['masses'][matching_indices]
+                hsml = snap_data['hsml'][matching_indices]
+                cs = snap_data['cs'][matching_indices]
+                temps = snap_data['temps'][matching_indices]
+                print (len(dens), pID_array.shape, dens, dens1)
+
+            else:
+                print ('pID mode is True, but no snapshot data provided...')
+                return None
+
+        else:
+            dens, vels, coords, masses, hsml, cs, temps = get_cloud_quants_hdf5(cloud_num, snap_num, params)
+            
         if project:
             print ("Projecting the cloud...")
 
