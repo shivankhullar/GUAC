@@ -199,7 +199,9 @@ def get_cloud_pop_quant_info(cloud_inds, snapnum, params, cloud_pop_data, get_fr
                                 'star_masses', 'star_coords', 'sfr', 'eps_ff', 'total_KE',\
                                     'rot_KE', 'turb_KE'])
     
-        cloud_num = cloud_inds[i]
+        #cloud_num = cloud_inds[i]
+        cloud_ind = cloud_inds[i]
+        cloud_num = cloud_pop_data.cloud_nums[cloud_ind]
         if get_from_cloud_box == True:
             # We will calculate quantities using all the particles in the cloud box
             coords, masses, hsml, dens, _, vels, cs, int_energy, temps, gas_pIDs, star_coords, star_masses, \
@@ -248,14 +250,20 @@ def get_cloud_pop_quant_info(cloud_inds, snapnum, params, cloud_pop_data, get_fr
         cloud_quants['c_s'] = cs
         cloud_quants['vels'] = vels
         cloud_quants['temps'] = temps
-        cloud_quants['total_mass'] = cloud_pop_data.cloud_total_masses[cloud_num]
-        cloud_quants['gal_dist'] = cloud_pop_data.r_gal_dists[cloud_num]
-        cloud_quants['z_dist'] = cloud_pop_data.z_dists[cloud_num]
-        cloud_quants['r_eff'] = cloud_pop_data.cloud_reffs[cloud_num]
-        cloud_quants['hmrad'] = cloud_pop_data.cloud_hmrads[cloud_num]
+        cloud_quants['total_mass'] = cloud_pop_data.cloud_total_masses[cloud_ind]
+        cloud_quants['gal_dist'] = cloud_pop_data.r_gal_dists[cloud_ind]
+        cloud_quants['z_dist'] = cloud_pop_data.z_dists[cloud_ind]
+        cloud_quants['r_eff'] = cloud_pop_data.cloud_reffs[cloud_ind]
+        cloud_quants['hmrad'] = cloud_pop_data.cloud_hmrads[cloud_ind]
+        #cloud_quants['total_mass'] = cloud_pop_data.cloud_total_masses[cloud_num]
+        #cloud_quants['gal_dist'] = cloud_pop_data.r_gal_dists[cloud_num]
+        #cloud_quants['z_dist'] = cloud_pop_data.z_dists[cloud_num]
+        #cloud_quants['r_eff'] = cloud_pop_data.cloud_reffs[cloud_num]
+        #cloud_quants['hmrad'] = cloud_pop_data.cloud_hmrads[cloud_num]
         cloud_quants['vel_disp'] = vel_disp
         cloud_quants['vel_disp_turb'] = turb_vel_disp
-        cloud_quants['vir'] = cloud_pop_data.cloud_virs[cloud_num]
+        cloud_quants['vir'] = cloud_pop_data.cloud_virs[cloud_ind]
+        #cloud_quants['vir'] = cloud_pop_data.cloud_virs[cloud_num]
         cloud_quants['mach'] = mach
         cloud_quants['mach_turb'] = mach_turb
         cloud_quants['sigma_mass'] = sigma_mass
