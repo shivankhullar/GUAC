@@ -64,6 +64,10 @@ class CloudSelector():
         for i in range(1, len(inds_list)):
             self.cloud_inds = np.intersect1d(self.cloud_inds, inds_list[i])
         
+        # Return the cloud_nums corresponding to the selected clouds inds
+        #self.cloud_nums = cloud_data.cloud_nums[self.cloud_inds]
+        #return self.cloud_nums
+
         return self.cloud_inds
 
 
