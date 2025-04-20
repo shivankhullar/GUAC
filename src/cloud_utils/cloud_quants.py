@@ -39,11 +39,12 @@ def get_cloud_quants_hdf5_pIDs(cloud_num, snap_num, params):
     childIDs = np.array(h['ParticleChildIDsNumber'])
     pID_array = np.array([pIDs, gen_nums, childIDs]).T
     dens = np.array(h['Density'])
+    masses = np.array(h['Masses'])
     #snap_data['pIDs'] = gal_quants0.data["ParticleIDs"]
     #snap_data['pIDgennum'] = gal_quants0.data["ParticleIDGenerationNumber"]
     #snap_data['pIDchilds'] = gal_quants0.data["ParticleChildIDsNumber"]
 
-    return pID_array, dens
+    return pID_array, dens, masses
 
 
 def get_cloud_quants_hdf5(cloud_num, snap_num, params):
@@ -247,7 +248,7 @@ def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_b
     if mode == 'cloud':
         # Load the particle data
         if pID_mode:
-            pID_array, dens1 = get_cloud_quants_hdf5_pIDs(cloud_num, snap_num, params)
+            pID_array, cloud_dens, cloud_masses = get_cloud_quants_hdf5_pIDs(cloud_num, snap_num, params)
             # We will match the pIDs with the snapshot data
             if snap_data:
                 snap_data_pID_array = np.array([snap_data['pIDs'], snap_data['pIDgennum'], snap_data['pIDchilds']]).T
@@ -267,7 +268,7 @@ def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_b
                 hsml = snap_data['hsml'][matching_indices]
                 cs = snap_data['cs'][matching_indices]
                 temps = snap_data['temps'][matching_indices]
-                print (len(dens), pID_array.shape, dens, dens1)
+                print (len(dens), pID_array.shape, len(cloud_dens), np.sum(masses), np.sum(cloud_masses))
 
             else:
                 print ('pID mode is True, but no snapshot data provided...')
@@ -532,7 +533,7 @@ def read_cloud_summary_data(params, snapnum, r_gal, h, MW_cut=False):
         z_dist = cloud_centre_proj[2] - gal_centre_proj[2]
         
         if MW_cut:
-            if dist>=r_gal or np.abs(z_dist)>=h:
+            if dist>=params.r_gal or np.abs(z_dist)>=params.h:
                 continue
         #if dist>=r_gal or np.abs(z_dist)>=h:
         #    continue
