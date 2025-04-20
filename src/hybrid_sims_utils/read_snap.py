@@ -10,7 +10,7 @@ import h5py
 
 
 
-def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, refinement_tag=False):
+def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, refinement_tag=False, verbose=True):
 
     if snap<10:
         snapname = 'snapshot_'+snapshot_suffix+'00{num}'.format(num=snap) 
@@ -24,7 +24,9 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
     else:
         filename = sim_path+sim+'/'+snapname+'.hdf5'
 
-    print ("Reading file:", filename)
+    if verbose:
+        print ("Reading file:", filename)
+    
     F = h5py.File(filename,"r")
     pdata = {}
     if refinement_tag:
