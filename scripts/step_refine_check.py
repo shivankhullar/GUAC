@@ -23,6 +23,7 @@ Options:
     --snapnum_range=<snapnum_range>                     Range of snapshots to plot [default: 0,100]
     --parallel=<parallel>                               Should the script execute in parallel? [default: False]
     --num_cores=<num_cores>                             Number of processors to run on [default: 4]
+    --fire_units=<fire_units>                           Should the script use FIRE units? [default: True]
 """
 
 from generic_utils.fire_utils import *
@@ -49,13 +50,13 @@ import os
 
 
 
-def plot_dist_res(pdata, snap_num, gas_dists, save_path):
+def plot_dist_res(pdata, snap_num, gas_dists, save_path, fire_units=True):
 
     
     fig, ax = plt.subplots()
     fig.set_size_inches(8, 6)
 
-    plt.scatter(gas_dists[gas_dists<2], pdata['Masses'][gas_dists<2]*1e10, s=1, alpha=0.5)
+    
 
     ax.set_yscale('log')
     ax.set_xscale('log')
@@ -63,9 +64,20 @@ def plot_dist_res(pdata, snap_num, gas_dists, save_path):
     ax.set_ylabel('Mass (cosmo units) [M$_{\\odot}$]', fontsize=18)
 
     #ax.legend(loc=5, prop={'size': 16})
+    if fire_units:
+        plt.scatter(gas_dists[gas_dists<2], pdata['Masses'][gas_dists<2]*1e10, s=1, alpha=0.5)
+        ax.set_xlim([1e-3, 2])
+        ax.set_ylim([0.1, 2e4])
+        ax.set_xlabel('Distance from refine center (cosmo units) [kpc]', fontsize=18)
+        ax.set_ylabel('Mass (cosmo units) [M$_{\\odot}$]', fontsize=18)
 
-    ax.set_xlim([1e-3, 2])
-    ax.set_ylim([0.1, 2e4])
+    else:
+        plt.scatter(gas_dists, pdata['Masses'], s=1, alpha=0.5)
+        ax.set_xlabel('Distance from refine center [pc]', fontsize=18)
+        ax.set_ylabel('Mass [M$_{\\odot}$]', fontsize=18)
+
+
+
     ax.minorticks_on()
     ax.tick_params(which = 'both', direction = 'in', labelbottom=True, \
                                 right = True, top=True, labelsize=16)
@@ -81,7 +93,7 @@ def plot_dist_res(pdata, snap_num, gas_dists, save_path):
     plt.close()
 
 
-def plot_surf_dens(image_box_size, pdata, snap_num, com, gas_dists, save_path):
+def plot_surf_dens(image_box_size, pdata, snap_num, com, gas_dists, save_path, fire_units):
     res = 800
     #box_size = pdata["BoxSize"] #f['Header'].attrs['BoxSize'] #pdata['BoxSize']
     center = com
@@ -102,11 +114,18 @@ def plot_surf_dens(image_box_size, pdata, snap_num, com, gas_dists, save_path):
     X, Y = np.meshgrid(X, Y, indexing='ij')
     fig, ax = plt.subplots()
     fig.set_size_inches(8,8)
-    sigma_gas_msun_pc2 = M.SurfaceDensity(M.m*1e10,center=center,\
+    if fire_units:
+        sigma_gas_msun_pc2 = M.SurfaceDensity(M.m*1e10,center=center,\
                                             size=image_box_size,res=res)/1e6 #*1e4
-    p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=1e-2,vmax=1e4), cmap='inferno')
+        p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=1e-2,vmax=5e4), cmap='inferno')
+        ax.scatter(com[0], com[1], c='g', s=10)
+    
+    else:
+        sigma_gas_msun_pc2 = M.SurfaceDensity(M.m,center=center,\
+                                            size=image_box_size,res=res)
+        p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=1,vmax=2e3), cmap='inferno')
+    
     #ax.scatter(tagged_coords[:,0], tagged_coords[:,1], c='r', s=1, alpha=0.5)
-    ax.scatter(com[0], com[1], c='g', s=10)
     ax.set_aspect('equal')
     ax.set_xlim([min_pos[0], max_pos[0]])
     ax.set_ylim([min_pos[1], max_pos[1]])
@@ -125,7 +144,7 @@ def plot_surf_dens(image_box_size, pdata, snap_num, com, gas_dists, save_path):
 
 
 def process_snapshot(args):
-    snap_num, sim, path, snapshot_suffix, snapdir, save_path, image_box_size, refinement_tag = args
+    snap_num, sim, path, snapshot_suffix, snapdir, save_path, image_box_size, refinement_tag, fire_units = args
     pdata, stardata, fire_stardata, refine_data, snapname = get_snap_data_hybrid(
         sim, path, snap_num, snapshot_suffix=snapshot_suffix, snapdir=snapdir, refinement_tag=refinement_tag)
 
@@ -146,8 +165,8 @@ def process_snapshot(args):
     gas_pos = pdata['Coordinates'] - com
     gas_dists = np.linalg.norm(gas_pos, axis=1)
 
-    plot_dist_res(pdata, snap_num, gas_dists, save_path)
-    plot_surf_dens(image_box_size, pdata, snap_num, com, gas_dists, save_path)
+    plot_dist_res(pdata, snap_num, gas_dists, save_path, fire_units=fire_units)
+    plot_surf_dens(image_box_size, pdata, snap_num, com, gas_dists, save_path, fire_units=fire_units)
 
     print(f'Finished plotting for snapshot {snap_num}')
 
@@ -165,6 +184,7 @@ if __name__ == '__main__':
     image_box_size = float(args['--image_box_size'])
     refinement_tag = convert_to_bool(args['--refinement_flag'])
     snapnum_range = convert_to_array(args['--snapnum_range'], dtype=np.int32)
+    fire_units = convert_to_bool(args['--fire_units'])
     print (save_path)
     #sim = 'gas_pID_test'
     
@@ -172,7 +192,7 @@ if __name__ == '__main__':
     #path = '/mnt/raid-project/murray/khullar/GMC_IC_Project/Sims/refinetag_test/'
     
     
-    snap_args = [(snap_num, sim, path, '', snapdir, save_path, image_box_size, refinement_tag) for snap_num in range(snapnum_range[0], snapnum_range[1] + 1)]
+    snap_args = [(snap_num, sim, path, '', snapdir, save_path, image_box_size, refinement_tag, fire_units) for snap_num in range(snapnum_range[0], snapnum_range[1] + 1)]
 
     if parallel:
         pool = multiprocessing.Pool(processes=num_cores)
