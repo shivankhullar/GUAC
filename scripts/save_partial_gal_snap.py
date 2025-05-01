@@ -73,7 +73,7 @@ def process_snapshot(params, snapnum, save_path, particle_type=0):
 
         print("Data loaded")
         
-        gal_quants0 = GalQuants(params, snapnum, r_gal, h)
+        gal_quants0 = GalQuants(params, snapnum, params.r_gal, params.h)
         gal_quants0.project(coords)
         gal_quants0.add_key("Masses", masses, 1)
         gal_quants0.add_key("Velocities", vels, 3)
@@ -107,7 +107,7 @@ def process_snapshot(params, snapnum, save_path, particle_type=0):
 
         print("Data loaded")
         
-        gal_quants4 = GalQuants(params, snapnum, r_gal, h)
+        gal_quants4 = GalQuants(params, snapnum, params.r_gal, params.h)
         gal_quants4.project(coords)
         gal_quants4.add_key("Masses", masses, 1)
         gal_quants4.add_key("Velocities", vels, 3)
