@@ -196,6 +196,220 @@ def get_cloud_box(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_box=
 
 
 def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_box=None, \
+                     snap_data=None, star_data=True, pID_mode=False):
+    """ 
+    Function to get the quantities of a cloud.
+
+    Inputs:
+        cloud_num: Cloud number.
+        snap_num: Snapshot number.
+        params: Parameters of the simulation.
+        cloud_reff_factor: Factor to multiply the cloud effective radius to get the box size.
+        cloud_box: If True, a box around the cloud is defined. If a dictionary, that is used as the box.
+        snap_data: If not None, the snapshot data is provided.
+        project: If True, the cloud is projected.
+        center_wrt_galaxy: If True, the cloud is centered wrt the galaxy.
+    
+    Outputs:
+        dens: Density of the cloud.
+        vels: Velocities of the cloud.
+        coords: Coordinates of the cloud.
+        masses: Masses of the cloud.
+        hsml: Smoothing lengths of the cloud.
+        cs: Sound speeds of the cloud.
+    """
+    #if project==True:
+    #    print ('This will only project if cloud_box=False ...')
+
+    _, cloud_centre, cloud_reff, _, _ = get_cloud_quick_info(snap_num, \
+                                                            params.nmin, params.vir, cloud_num, params)
+    
+    mode = 'box'
+    # Define the box around the cloud
+    if cloud_box is None or cloud_box == True:
+        #cloud_box = CloudBox()
+        cloud_box = dict.fromkeys(['x_max', 'x_min', 'y_max', 'y_min', 'z_max', 'z_min']) 
+        cloud_box['x_max'] = cloud_centre[0] + cloud_reff_factor*cloud_reff
+        cloud_box['x_min'] = cloud_centre[0] - cloud_reff_factor*cloud_reff
+
+        cloud_box['y_max'] = cloud_centre[1] + cloud_reff_factor*cloud_reff
+        cloud_box['y_min'] = cloud_centre[1] - cloud_reff_factor*cloud_reff
+
+        cloud_box['z_max'] = cloud_centre[2] + cloud_reff_factor*cloud_reff
+        cloud_box['z_min'] = cloud_centre[2] - cloud_reff_factor*cloud_reff
+    # If cloud_box is a dictionary use that, else just return the cloud from get_cloud_quants_hdf5
+    elif type(cloud_box) == dict:
+        print ('Using the cloud box provided...')
+    if cloud_box == False:
+        mode = 'cloud'
+
+
+    #print ('Loading particle data...')
+    if mode == 'cloud':
+        # Load the particle data
+        if pID_mode:
+            pID_array, cloud_dens, cloud_masses = get_cloud_quants_hdf5_pIDs(cloud_num, snap_num, params)
+            # We will match the pIDs with the snapshot data
+            if snap_data:
+                snap_data_pID_array = np.array([snap_data['pIDs'], snap_data['pIDgennum'], snap_data['pIDchilds']]).T
+                # Find rows where all 3 columns match
+                A = snap_data_pID_array
+                B = pID_array
+                # Convert rows to tuples for set comparison
+                set_B = set(map(tuple, B))
+
+                # Get indices in A where row exists in B
+                matching_indices = [i for i, row in enumerate(A) if tuple(row) in set_B]
+                
+                dens = snap_data['dens'][matching_indices]
+                vels = snap_data['vels'][matching_indices]
+                coords = snap_data['coords'][matching_indices]
+                masses = snap_data['masses'][matching_indices]
+                hsml = snap_data['hsml'][matching_indices]
+                cs = snap_data['cs'][matching_indices]
+                temps = snap_data['temps'][matching_indices]
+                #print (len(dens), pID_array.shape, len(cloud_dens), np.sum(masses), np.sum(cloud_masses))
+
+            else:
+                print ('pID mode is True, but no snapshot data provided...')
+                return None
+
+        else:
+            dens, vels, coords, masses, hsml, cs, temps = get_cloud_quants_hdf5(cloud_num, snap_num, params)
+            
+        
+        
+        if star_data:
+            if snap_data is not None:
+                # THESE HAVE TO BE YOUNG STARS, CURRENTLY THEY ARE NOT
+                #star_coords = snap_data['star_coords']
+                #star_masses = snap_data['star_masses']
+                young_star_inds = np.where(snap_data['star_ages']<=params.age_cut)[0]      # in Myr
+                star_coords = snap_data['star_coords'][young_star_inds]
+                star_masses = snap_data['star_masses'][young_star_inds]
+            else:
+                print ("Star data is not available...")
+
+            dists = np.sqrt((star_coords[:,0]-cloud_centre[0])**2+\
+                            (star_coords[:,1]-cloud_centre[1])**2+\
+                            (star_coords[:,2]-cloud_centre[2])**2)
+            star_inds = np.where(dists<=cloud_reff)[0]
+            final_star_coords = star_coords[star_inds]
+            final_star_masses = star_masses[star_inds]
+            
+            return dens, vels, coords, masses, hsml, cs, temps, \
+                    final_star_coords, final_star_masses
+
+        return dens, vels, coords, masses, hsml, cs, temps
+
+    if mode == 'box':
+        if snap_data is not None:
+            # Select the particles within the box
+            coords = snap_data['coords']
+            masses = snap_data['masses']
+            hsml = snap_data['hsml']
+            dens = snap_data['dens']
+            temps = snap_data['temps']
+            vels = snap_data['vels']
+            cs = snap_data['cs']
+            int_energy = snap_data['int_energy']
+            pIDs = snap_data['pIDs']
+        else:
+            # Load the snapshot data
+            dens = load_fire_data_arr('gas', 'dens', snap_num, params)
+            coords = load_fire_data_arr('gas', 'coords', snap_num, params)
+            masses = load_fire_data_arr('gas', 'masses', snap_num, params)
+            temps = load_fire_data_arr('gas', 'temps', snap_num, params)
+            vels = load_fire_data_arr('gas', 'vels', snap_num, params)
+            hsml = load_fire_data_arr('gas', 'hsml', snap_num, params)
+            int_energy = load_fire_data('InternalEnergy', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            metal = load_fire_data('Metallicity', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            n_elec = load_fire_data('ElectronAbundance', 0, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+            f_neutral = np.zeros(0)
+            f_molec = np.zeros(0)
+            z_tot = metal[:, 0]
+            z_he = metal[:, 1]
+
+            value='Temp'
+            if not temps:
+                temps = get_temperature(int_energy, z_he, n_elec, z_tot, dens, f_neutral=f_neutral, f_molec=f_molec, key=value)
+            weights = get_temperature(int_energy, z_he, n_elec, z_tot, dens, f_neutral=f_neutral, f_molec=f_molec, key='Weight')
+
+            m_p = 1.67e-24          # mass of proton (g)
+            k_B = 1.38e-16          # Boltzmann constant (erg/K)
+            cs = np.sqrt(k_B*temps/(weights*m_p))/(1e5)  # in km/s
+
+
+        inds_x = np.where((coords[:,0]>cloud_box['x_min'])&(coords[:,0]<cloud_box['x_max']))[0]
+        inds_y = np.where((coords[:,1]>cloud_box['y_min'])&(coords[:,1]<cloud_box['y_max']))[0]
+        inds_z = np.where((coords[:,2]>cloud_box['z_min'])&(coords[:,2]<cloud_box['z_max']))[0]
+        final_inds = np.intersect1d(np.intersect1d(inds_x, inds_y), inds_z)
+    
+        coords_x = np.take(coords[:,0], final_inds)
+        coords_y = np.take(coords[:,1], final_inds)
+        coords_z = np.take(coords[:,2], final_inds)
+        final_gas_coords = np.array([coords_x, coords_y, coords_z]).T
+
+        final_gas_masses = np.take(masses, final_inds)
+        final_gas_smoothing_lengths = np.take(hsml, final_inds)
+        final_gas_densities = np.take(dens, final_inds)
+        final_gas_temps = np.take(temps, final_inds)
+        final_gas_cs = np.take(cs, final_inds)
+        final_gas_int_energy = np.take(int_energy, final_inds)
+        final_temps = np.take(temps, final_inds)
+        vels_x = np.take(vels[:,0], final_inds)
+        vels_y = np.take(vels[:,1], final_inds)
+        vels_z = np.take(vels[:,2], final_inds)
+        final_gas_vels = np.array([vels_x, vels_y, vels_z]).T
+        final_gas_pIDs = pIDs[final_inds]
+        
+        if star_data:
+            if snap_data is not None:
+                # BE CAREFUL HERE, STAR COORDS ARE FOR ALL STARS, NOT JUST THE YOUNG ONES
+                star_coords = snap_data['star_coords']
+                star_masses = snap_data['star_masses']
+                star_vels = snap_data['star_vels']
+                star_pIDs = snap_data['star_pIDs']
+                sfts = snap_data['sfts']
+            else:
+                # THESE ARE COORDS AND MASSES FOR YOUNG STARS. 
+                star_coords = load_fire_data_arr('star', 'coords', snap_num, params)
+                star_masses = load_fire_data_arr('star', 'masses', snap_num, params)
+                # THESE ARE ALL STARS AGAIN NOW... CODE IS A BIT MESSED UP ATM.
+                star_vels = load_fire_data('Velocities', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+                star_pIDs = load_fire_data('ParticleIDs', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+                sfts = load_fire_data('StellarFormationTime', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
+
+            inds_x = np.where((star_coords[:,0]>cloud_box['x_min'])&(star_coords[:,0]<cloud_box['x_max']))[0]
+            inds_y = np.where((star_coords[:,1]>cloud_box['y_min'])&(star_coords[:,1]<cloud_box['y_max']))[0]
+            inds_z = np.where((star_coords[:,2]>cloud_box['z_min'])&(star_coords[:,2]<cloud_box['z_max']))[0]
+            final_inds = np.intersect1d(np.intersect1d(inds_x, inds_y), inds_z)
+
+            final_star_coords = star_coords[final_inds]
+            final_star_masses = star_masses[final_inds]
+            vels_x = np.take(star_vels[:,0], final_inds)
+            vels_y = np.take(star_vels[:,1], final_inds)
+            vels_z = np.take(star_vels[:,2], final_inds)
+            final_star_vels = np.array([vels_x, vels_y, vels_z]).T
+            final_star_pIDs = star_pIDs[final_inds]
+            final_sfts = sfts[final_inds]
+
+
+            return final_gas_coords, final_gas_masses, final_gas_smoothing_lengths, \
+                final_gas_densities, final_gas_temps, final_gas_vels, final_gas_cs, \
+                final_gas_int_energy, final_temps, final_gas_pIDs, final_star_coords, final_star_masses, \
+                    final_star_pIDs, final_star_vels, final_sfts, cloud_box
+
+        else:
+            return final_gas_coords, final_gas_masses, final_gas_smoothing_lengths, \
+                    final_gas_densities, final_gas_temps, final_gas_vels, final_gas_cs, \
+                        final_gas_int_energy, final_gas_pIDs, cloud_box
+
+    return None
+
+
+
+def get_cloud_quants_old(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_box=None, \
                      snap_data=None, project=False, center_wrt_galaxy=False, star_data=True, pID_mode=False):
     """ 
     Function to get the quantities of a cloud.
@@ -378,14 +592,17 @@ def get_cloud_quants(cloud_num, snap_num, params, cloud_reff_factor=1.5, cloud_b
         
         if star_data:
             if snap_data is not None:
+                # BE CAREFUL HERE, STAR COORDS ARE FOR ALL STARS, NOT JUST THE YOUNG ONES
                 star_coords = snap_data['star_coords']
                 star_masses = snap_data['star_masses']
                 star_vels = snap_data['star_vels']
                 star_pIDs = snap_data['star_pIDs']
                 sfts = snap_data['sfts']
             else:
+                # THESE ARE COORDS AND MASSES FOR YOUNG STARS. 
                 star_coords = load_fire_data_arr('star', 'coords', snap_num, params)
                 star_masses = load_fire_data_arr('star', 'masses', snap_num, params)
+                # THESE ARE ALL STARS AGAIN NOW... CODE IS A BIT MESSED UP ATM.
                 star_vels = load_fire_data('Velocities', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
                 star_pIDs = load_fire_data('ParticleIDs', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
                 sfts = load_fire_data('StellarFormationTime', 4, params.path+'snapdir_{num}'.format(num=snap_num), snap_num)
