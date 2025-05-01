@@ -149,7 +149,7 @@ def calculate_density_pdf_variance(dens, weights=None, s_bins=None):
     bin_centers = (binned[1:]+binned[:-1])/2
     return sigma, n, bin_centers
 
-def get_epsff_cloud(dens, gas_masses, star_masses):
+def get_epsff_cloud(dens, gas_masses, sfr):
     """ 
     Function to calculate the star formation efficiency per free-fall time of a cloud.
 
@@ -168,7 +168,7 @@ def get_epsff_cloud(dens, gas_masses, star_masses):
     G = 6.67430e-8  ## in cgs -- cm^3 g^-1 s^-2
     G = G*Msun*Myr**2/kpc**3
     multi_tff = 1/(np.sum(gas_masses*np.sqrt(32*G*1e10*dens/(3*np.pi)))/np.sum(gas_masses)) # in Myr
-    eps_ff = (np.sum(star_masses)*1e10)/(np.sum(gas_masses)*1e10/multi_tff)     # in Msun/Myr over Msun/Myr, so unitless
+    eps_ff = sfr/(np.sum(gas_masses)*1e10/multi_tff)     # in Msun/Myr over Msun/Myr, so unitless
     return eps_ff
 
 
@@ -215,7 +215,7 @@ def get_cloud_pop_quant_info(cloud_inds, snapnum, params, cloud_pop_data, get_fr
                                                     params, cloud_reff_factor=2, cloud_box=False,\
                                                         snap_data=snap_data, star_data=True, pID_mode=True)
             else:
-                        dens, vels, coords, masses, hsml, cs, temps, star_coords, star_masses = get_cloud_quants(cloud_num, snapnum, \
+                dens, vels, coords, masses, hsml, cs, temps, star_coords, star_masses = get_cloud_quants(cloud_num, snapnum, \
                                                     params, cloud_reff_factor=2, cloud_box=False,\
                                                         snap_data=None, star_data=True)
 
@@ -277,8 +277,8 @@ def get_cloud_pop_quant_info(cloud_inds, snapnum, params, cloud_pop_data, get_fr
         cloud_quants['bin_centers'] = bin_centers
         cloud_quants['star_masses'] = star_masses
         cloud_quants['star_coords'] = star_coords
-        cloud_quants['sfr'] = np.sum(star_masses)*1e10              # in Msun/Myr
-        cloud_quants['eps_ff'] = get_epsff_cloud(dens, masses, star_masses)
+        cloud_quants['sfr'] = np.sum(star_masses)*1e10/params.age_cut              # in Msun/Myr
+        cloud_quants['eps_ff'] = get_epsff_cloud(dens, masses, np.sum(star_masses)*1e10/params.age_cut)
         cloud_quants['total_KE'] = total_KE
         cloud_quants['rot_KE'] = rot_KE
         cloud_quants['turb_KE'] = turb_KE
