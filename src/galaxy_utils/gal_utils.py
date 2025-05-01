@@ -7,6 +7,8 @@ Date: April 2024
 
 #import sys
 #sys.path.append('/src/generic_utils/')
+import generic_utils
+import generic_utils.fire_utils
 from generic_utils.fire_utils import *
 import generic_utils.constants as const
 
@@ -41,10 +43,10 @@ class GalQuants():
 
     def spherical_cut(self, coords_data):
         if self.gal_centre is None:
-            self.gal_centre = get_galaxy_centre(self.params, self.snapnum)
+            self.gal_centre = generic_utils.fire_utils.get_galaxy_centre(self.params, self.snapnum)
             #gal_centre = Get_Galaxy_Centre(self.params, self.snapnum)    
         if self.proj is None:
-            self.proj = get_galaxy_proj_matrix(self.params, self.snapnum)
+            self.proj = generic_utils.fire_utils.get_galaxy_proj_matrix(self.params, self.snapnum)
         #gal_centre_proj = np.matmul(proj, gal_centre)
         
         gal_dist = np.sqrt((coords_data[:,0]-self.gal_centre[0])**2+\
@@ -56,11 +58,11 @@ class GalQuants():
 
     def project(self, coords_data):
         if self.gal_centre is None:
-            self.gal_centre = get_galaxy_centre(self.params, self.snapnum)
+            self.gal_centre = generic_utils.fire_utils.get_galaxy_centre(self.params, self.snapnum)
             #print ('Galactic center:', self.gal_centre)
             #gal_centre = Get_Galaxy_Centre(self.params, self.snapnum)    
         if self.proj is None:
-            self.proj = get_galaxy_proj_matrix(self.params, self.snapnum)
+            self.proj = generic_utils.fire_utils.get_galaxy_proj_matrix(self.params, self.snapnum)
             #print (self.proj)
 
             #proj = Get_Galaxy_Proj_Matrix(self.params, self.snapnum)
