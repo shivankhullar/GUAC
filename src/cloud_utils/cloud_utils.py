@@ -10,7 +10,7 @@ from generic_utils.fire_utils import *
 from galaxy_utils.gal_utils import *
 
 
-def get_cloud_quick_info(snapnum, nmin, vir, cloud_num, params):
+def get_cloud_quick_info(snapnum, nmin, vir, cloud_num, params, project=True):
     """
     This is a function to get the quantities of a cloud from the bound_nX_alphaY_snapnum.dat file.
 
@@ -40,14 +40,27 @@ def get_cloud_quick_info(snapnum, nmin, vir, cloud_num, params):
     cloud_centre_z = float(datContent[i+header][3])
     cloud_reff = float(datContent[i+header][7])
     cloud_vir = float(datContent[i+header][10])
-    
     cloud_centre = np.array([cloud_centre_x, cloud_centre_y, cloud_centre_z])
-    gal_centre = get_galaxy_centre(params, snapnum)
-    dist = np.sqrt((cloud_centre_x-gal_centre[0])**2+(cloud_centre_y-gal_centre[1])**2+\
-                    (cloud_centre_z-gal_centre[2])**2)
     
-    return cloud_total_mass, cloud_centre, cloud_reff, cloud_vir, dist
+    if project==False:
+        gal_centre = get_galaxy_centre(params, snapnum)
+        dist = np.sqrt((cloud_centre_x-gal_centre[0])**2+(cloud_centre_y-gal_centre[1])**2+\
+                        (cloud_centre_z-gal_centre[2])**2)
+        
+        return cloud_total_mass, cloud_centre, cloud_reff, cloud_vir, dist
 
+
+    else:
+        #print ("Projecting the cloud...")
+        proj = get_galaxy_proj_matrix(params, snapnum)
+        proj_cloud_centre = np.matmul(proj, cloud_centre)
+        gal_centre = get_galaxy_centre(params, snapnum) 
+        proj_gal_centre = np.matmul(proj, gal_centre)
+        dist = np.sqrt((proj_cloud_centre[0]-proj_gal_centre[0])**2+(proj_cloud_centre[1]-proj_gal_centre[1])**2+\
+                        (proj_cloud_centre[2]-proj_gal_centre[2])**2)
+        
+
+        return cloud_total_mass, proj_cloud_centre, cloud_reff, cloud_vir, dist
 
 
 
@@ -58,8 +71,9 @@ class CloudChain():
     Class to find out a cloud chain stemming from the first cloud.
     """
     def __init__(self, cloud_num, snap_num, params):
-        file_name = params.path+params.sub_dir+params.filename_prefix+params.frac_thresh\
-                    +"_"+str(params.start_snap)+"_"+str(params.last_snap)+"_names"+".txt"
+        #file_name = params.path+params.sub_dir+params.filename_prefix+params.frac_thresh\
+        #            +"_"+str(params.start_snap)+"_"+str(params.last_snap)+"_names"+".txt"
+        file_name = params.linked_filename
         my_file = open(file_name, "r")
 
         content_list = my_file.readlines()
