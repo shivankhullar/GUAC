@@ -47,7 +47,7 @@ def get_cloud_quants_hdf5_pIDs(cloud_num, snap_num, params):
     return pID_array, dens, masses
 
 
-def get_cloud_quants_hdf5(cloud_num, snap_num, params):
+def get_cloud_quants_hdf5(cloud_num, snap_num, params, no_temps=False, projection=False):
     """
     This is a function to get the quantities of a cloud from the hdf5 file.
     Inputs:
@@ -79,6 +79,25 @@ def get_cloud_quants_hdf5(cloud_num, snap_num, params):
     hsml = np.array(h['SmoothingLength'])
     #phi = np.array(h['Potential'])
     #gizmo_sfrs = np.array(h['StarFormationRate'])
+    if projection:
+        proj = get_galaxy_proj_matrix(params, snap_num)
+        proj_gas_coords = []
+        proj_gas_vels = []
+        for i in range(0, len(coords)):
+            proj_gas_coords.append(np.matmul(proj, coords[i]))
+            proj_gas_vels.append(np.matmul(proj, vels[i]))
+        proj_gas_coords = np.array(proj_gas_coords)
+        proj_gas_vels = np.array(proj_gas_vels)
+        
+        coords = proj_gas_coords
+        vels = proj_gas_vels
+
+        #proj_cloud_centre = np.matmul(proj, cloud_centre)
+
+    if no_temps:
+        return dens, vels, coords, masses, hsml
+    
+
     int_energy = np.array(h['InternalEnergy'])
     metal = np.array(h['Metallicity'])
     n_elec = np.array(h['ElectronAbundance'])
