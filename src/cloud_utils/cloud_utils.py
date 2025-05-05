@@ -94,7 +94,8 @@ class CloudChain():
         flag = 0
         for i in range(0, len(cloud_list_names)):
             if search_key in cloud_list_names[i]:
-                print ('Search key', search_key, i)
+                if params.verbose:
+                    print ('Search key', search_key, i)
                 self.cloud_list = cloud_list_names[i]
 
                 flag = 1

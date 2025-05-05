@@ -40,6 +40,7 @@ class GalQuants():
         self.data = {}
         self.gal_centre = gal_centre
         self.proj = proj
+        self.verbose = params.verbose
 
     def spherical_cut(self, coords_data):
         if self.gal_centre is None:
@@ -74,8 +75,8 @@ class GalQuants():
         init_coords_y = np.take(coords_data[:,1], self.sphere_inds)
         init_coords_z = np.take(coords_data[:,2], self.sphere_inds)
         gas_coords = np.array([init_coords_x, init_coords_y, init_coords_z]).T
-        
-        print ("Starting projection...")
+        if self.verbose:
+            print ("Starting projection...")
 
         proj_gas_coords = []
         for i in range(0, len(gas_coords)):
@@ -96,8 +97,8 @@ class GalQuants():
         gal_dist_proj = np.sqrt((proj_gas_coords[:,0]-self.gal_centre_proj[0])**2+\
                             (proj_gas_coords[:,1]-self.gal_centre_proj[1])**2+\
                        (proj_gas_coords[:,2]-self.gal_centre_proj[2])**2)
-    
-        print ("Projection done...")
+        if self.verbose:
+            print ("Projection done...")
         
         proj_gas_z_dist = np.abs(proj_gas_coords[:,2]-self.gal_centre_proj[2]) 
                             #np.take(np.abs(proj_gas_coords[:,2]-gal_centre_proj[2]), \
@@ -134,7 +135,8 @@ class GalQuants():
             final_data = np.array([final_data_x, final_data_y, final_data_z]).T
             #self.data[key] = np.array([final_data_x, final_data_y, final_data_z]).T
             if projection:
-                print ("Starting projection...")
+                if self.verbose:
+                    print ("Starting projection...")
 
                 proj_final_data = []
                 for i in range(0, len(final_data)):
@@ -144,7 +146,8 @@ class GalQuants():
                         #print('Percent complete:', i/len(gas_coords)*100)
                 
                 self.data[key] = np.array(proj_final_data)
-                print ("Projection done...")
+                if self.verbose:
+                    print ("Projection done...")
             
             else:
                 self.data[key] = final_data

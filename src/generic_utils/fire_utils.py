@@ -58,7 +58,8 @@ class Params():
                     cph_sub_dir="CloudPhinderData/", image_path="img_data/", \
                     img_fname_prefix='center_proj_', img_fname_suffix='.hdf5', \
                     hdf5_file_prefix = 'Clouds_', frac_thresh='thresh0.0', sim='m12i_final_fb_57k', \
-                    r_gal=25, h=0.4,  gal_quants_sub_dir='gal_quants/', vels_sub_dir='vel_sub/', phinder_sub_dir="VoidPhinderData/"):
+                    r_gal=25, h=0.4,  gal_quants_sub_dir='gal_quants/', vels_sub_dir='vel_sub/', \
+                    phinder_sub_dir="VoidPhinderData/", verbose=True):
 
         self.sim=sim
         self.path=path+sim+'/'
@@ -87,6 +88,7 @@ class Params():
         self.gal_quants_sub_dir = gal_quants_sub_dir
         self.vels_sub_dir = vels_sub_dir
         self.phinder_sub_dir = phinder_sub_dir
+        self.verbose = verbose
   
 
 def load_fire_data_arr(key, field, snapnum, params):
@@ -333,7 +335,8 @@ def get_snap_data(params, snap_num, gal_quants=True, cosmo=False):
     snap_data : dictionary containing the snapshot data
     """
     snap_data = dict()
-    print ('Loading snap data for snapshot:', snap_num, params.sim)
+    if params.verbose:
+        print ('Loading snap data for snapshot:', snap_num, params.sim)
 
     if gal_quants==True:
         gal_quants0 = load_gal_quants(params, snap_num, 0)
@@ -346,7 +349,9 @@ def get_snap_data(params, snap_num, gal_quants=True, cosmo=False):
         if gal_quants0.data["SoundSpeed"] is not None:
             snap_data['cs'] = gal_quants0.data["SoundSpeed"]
         else:
-            print ("Sound speed not found in gal_quants0, calculating from temperature...")
+            if params.verbose:
+                print ("Sound speed not found in gal_quants0, calculating from temperature...")
+            
             weights = get_temperature(gal_quants0.data["InternalEnergy"], z_he, n_elec, z_tot, dens, f_neutral=f_neutral, f_molec=f_molec, key='Weight')
             m_p = 1.67e-24          # mass of proton (g)
             k_B = 1.38e-16          # Boltzmann constant (erg/K)
