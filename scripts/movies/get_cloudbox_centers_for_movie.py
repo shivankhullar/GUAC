@@ -62,6 +62,7 @@ def get_maximum_cloud_reff(chain, params):
 def process_single_snapshot(args):
     snap_num, tracked_cloud_pID_array, params, chain = args
     try:
+        print (f"Processing snapshot {snap_num}...")
         snap_data = get_snap_data(params, snap_num, gal_quants=True)
         snap_data_pID_array = np.array([snap_data['pIDs'], snap_data['pIDgennum'], snap_data['pIDchilds']]).T
 
@@ -213,11 +214,11 @@ if __name__ == "__main__":
                     r_gal=r_gal, h=h, gal_quants_sub_dir=gal_quants_sub_dir, vels_sub_dir=vels_sub_dir,
                     phinder_sub_dir=cph_sub_dir, age_cut=age_cut,
                     dat_file_header_size=dat_file_header_size, nmin=nmin, vir=vir,
-                    cloud_num_digits=cloud_num_digits, snapshot_num_digits=snapshot_num_digits)
+                    cloud_num_digits=cloud_num_digits, snapshot_num_digits=snapshot_num_digits, verbose=False)
 
     params.linked_filename = f"{params.path}{params.sub_dir}{params.filename_prefix}n{params.nmin}_alpha{params.vir}_{params.frac_thresh}_{params.start_snap}_{params.last_snap}_names.txt"
 
-    selected_snap = 750
+    selected_snap = snapnum
     selected_cloud_nums = np.array([cloud_num])
     selected_cloud_list = [f'Cloud{cloud_num:04d}Snap{selected_snap}']
 

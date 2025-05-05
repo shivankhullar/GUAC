@@ -111,7 +111,7 @@ def make_cloud_plot(final_gas_coords, final_gas_masses, final_gas_hsmls, final_s
         bound_y = np.append(coords[hull.vertices, 1], coords[hull.vertices[0], 1])
         ax.plot(bound_x, bound_y, color='w', lw=1, linestyle='--')
 
-    age_cut = 5
+    age_cut = 10 #5
     young = final_star_ages < age_cut
     ax.scatter(final_star_coords[young, 0], final_star_coords[young, 1], s=50, c=final_star_ages[young], cmap='bwr', marker='*', alpha=1)
 
@@ -130,6 +130,7 @@ def make_cloud_plot(final_gas_coords, final_gas_masses, final_gas_hsmls, final_s
 def process_snapshot_movie(args):
     snap_num, params, cloud_name, cloud_name, selected_snap, save_dir = args
     try:
+        print ("Processing snapshot:", snap_num)
         snap_data = get_snap_data(params, snap_num, gal_quants=True)
 
         star_coords = snap_data['star_coords']
@@ -178,7 +179,7 @@ def process_snapshot_movie(args):
         center, smoothed_center = load_box_center(params, cloud_name, box_save_dir, snap=snap_num)
         #x_mean, y_mean, z_mean = smoothed_center[1:]
         x_mean, y_mean, z_mean = center[1:]
-        print (f"Snapshot {snap_num} has box center: {x_mean}, {y_mean}, {z_mean}")
+        #print (f"Snapshot {snap_num} has box center: {x_mean}, {y_mean}, {z_mean}")
 
         # Now we will get all the gas particles and star particles within this box from the snapshot data.
         inds_x = np.where((coords[:,0]>x_mean-box_size/2)&(coords[:,0]<x_mean+box_size/2))[0]
@@ -266,7 +267,7 @@ if __name__ == "__main__":
                     r_gal=r_gal, h=h, gal_quants_sub_dir=gal_quants_sub_dir, vels_sub_dir=vels_sub_dir,
                     phinder_sub_dir=cph_sub_dir, age_cut=age_cut,
                     dat_file_header_size=dat_file_header_size, nmin=nmin, vir=vir,
-                    cloud_num_digits=cloud_num_digits, snapshot_num_digits=snapshot_num_digits)
+                    cloud_num_digits=cloud_num_digits, snapshot_num_digits=snapshot_num_digits, verbose=False)
 
     params.linked_filename = f"{params.path}{params.sub_dir}{params.filename_prefix}n{params.nmin}_alpha{params.vir}_{params.frac_thresh}_{params.start_snap}_{params.last_snap}_names.txt"
 
