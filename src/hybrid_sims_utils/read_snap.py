@@ -30,10 +30,10 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
     F = h5py.File(filename,"r")
     pdata = {}
     if refinement_tag:
-        for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber", "RefinementFlag":#, "Potential":
+        for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber", "MagneticField", "RefinementFlag":#, "Potential":
             pdata[field] = F["PartType0"][field][:]#[density_cut]
     else:
-        for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber":
+        for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber", "MagneticField":
             pdata[field] = F["PartType0"][field][:]
 
     try:
