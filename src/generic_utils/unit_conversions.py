@@ -1,5 +1,6 @@
 """
 This file contains utility functions for converting between cosmological units and physical. 
+This file is INCOMPLETE or DOESN'T WORK or REDUNDANT. IGNORE IT PLEASE!
 
 Author: Shivan Khullar
 Date: July 2024
