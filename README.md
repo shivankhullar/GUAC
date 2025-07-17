@@ -19,7 +19,10 @@ If you want to use this, one way is to create a ```PYTHON``` directory in your h
 ```
 export PYTHONPATH=$HOME/PYTHON
 export GUAC_PATH=$HOME/PYTHON/GUAC/src
-export GUAC_SCRIPT_PATH=$HOME/PYTHON/GUAC/scripts
+GUAC_SCRIPT_PATH="$HOME/PYTHON/GUAC/scripts"
+while IFS= read -r -d '' dir; do
+    export PATH="$PATH:$dir"
+done < <(find "$GUAC_SCRIPT_PATH" -type d -print0)
 export PYTHONPATH=$PYTHONPATH:$GUAC_PATH
 export PYTHONPATH=$PYTHONPATH:$GUAC_SCRIPT_PATH
 export PATH=$PATH:$PYTHONPATH
