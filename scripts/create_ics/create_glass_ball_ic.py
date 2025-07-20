@@ -9,17 +9,19 @@ Usage: create_glass_box_ic.py [options]
 
 Options:
     -h, --help                  Show this screen
-    --N_gas=<N_gas>             Number of gas particles [default: 100000]
-    --M_gas=<M_gas>             Total mass of gas particles [default: 1000]
+    --R=<pc>             Outer radius of the cloud in pc [default: 10.0]
+    --M=<msun>           Mass of the cloud in msun [default: 2e4]
+    --N=<N>              Number of gas particles [default: 2000000]
+    --density_exponent=<f>   Power law exponent of the density profile [default: 0.0]
+
+
     --vel=<vel>                 Velocity of gas particles [default: 0.0]
     --T=<T>                     Temperature of gas particles [default: 20.0]
     --glass_path=<glass_path>   Path to glass file [default: ./glass_orig.npy]
     --file_name=<file_name>     Name of output file [default: glass_ball.hdf5]
+    --file_params=<file_params>   Name of parameter file [default: ./params.txt]
     --out_path=<out_path>       Path to output file [default: ./]
         
-    --R=<pc>             Outer radius of the cloud in pc [default: 10.0]
-    --M=<msun>           Mass of the cloud in msun [default: 2e4]
-    --N=<N>              Number of gas particles [default: 2000000]
     --density_exponent=<f>   Power law exponent of the density profile [default: 0.0]
     
     --bturb=<f>          Magnetic energy as a fraction of the binding energy [default: 0.1]
@@ -80,6 +82,7 @@ arguments = docopt(__doc__)
 R = float(arguments["--R"])
 M_gas = float(arguments["--M"])
 N_gas = int(float(arguments["--N"]) + 0.5)
+density_exponent = float(arguments["--density_exponent"])
 
 tmax = int(float(arguments["--tmax"]))
 nsnap = int(float(arguments["--nsnap"]))
@@ -87,7 +90,7 @@ nsnap = int(float(arguments["--nsnap"]))
 magnetic_field = float(arguments["--bturb"])
 bfixed = float(arguments["--bfixed"])
 
-filename = arguments["--filename"]
+filename = arguments["--file_name"]
 diffuse_gas = not arguments["--no_diffuse_gas"]
 
 param_only = arguments["--param_only"]
@@ -141,15 +144,11 @@ else:  # something more FIRE-like, where we rely on a sub-grid prescription turn
 
 tff = (3 * np.pi / (32 * G * rho_avg)) ** 0.5
 L = (4 * np.pi * R**3 / 3) ** (1.0 / 3)  # volume-equivalent box size
-vrms = arguments["--vel"]
+vrms = float(arguments["--vel"])
 #(6 / 5 * G * M_gas / R) ** 0.5 * turbulence**0.5
 
-
-paramsfile = str(
-    open(
-        os.path.realpath(__file__).replace("MakeCloud.py", "params.txt"), "r"
-    ).read()
-)
+file_params = arguments["--file_params"]
+paramsfile = str(open(file_params, "r").read())
 
 
 replacements = {
@@ -250,15 +249,15 @@ else:
 #v = v - np.average(v, axis=0)
 x = x - np.average(x, axis=0)
 
-r, phi = np.sum(x**2, axis=1) ** 0.5, np.arctan2(x[:, 1], x[:, 0])
-theta = np.arccos(x[:, 2] / r)
-phi += phimode * np.sin(2 * phi) / 2
-x = (
-    r[:, np.newaxis]
-    * np.c_[
-        np.cos(phi) * np.sin(theta), np.sin(phi) * np.sin(theta), np.cos(theta)
-    ]
-)
+#r, phi = np.sum(x**2, axis=1) ** 0.5, np.arctan2(x[:, 1], x[:, 0])
+#theta = np.arccos(x[:, 2] / r)
+#phi += phimode * np.sin(2 * phi) / 2
+#x = (
+#    r[:, np.newaxis]
+#    * np.c_[
+#        np.cos(phi) * np.sin(theta), np.sin(phi) * np.sin(theta), np.cos(theta)
+#    ]
+#)
 
 
 
@@ -306,8 +305,7 @@ if diffuse_gas:
         )
     else:
         x_warm = boxsize * np.random.rand(N_warm, 3) - boxsize / 2
-        if impact_dist == 0:
-            x_warm = x_warm[np.sum(x_warm**2, axis=1) > R**2]
+        
         N_warm = len(x_warm)
         mgas = np.concatenate(
             [mgas, np.repeat(mgas.sum() / len(mgas), N_warm)]
@@ -320,25 +318,7 @@ if diffuse_gas:
     )
     u = np.concatenate([u, np.repeat(101.0, N_warm)])
 
-    if makecylinder:
-        # The magnetic field is paralell to the cylinder (true at low densities, so probably fine for IC)
-        B_cyl = np.concatenate(
-            [B, np.repeat(Bmag, N_warm)[:, np.newaxis] * np.array([1, 0, 0])]
-        )
-        # Add diffuse medium
-        M_warm_cyl = (boxsize_cyl**3 - (4 * np.pi * R**3 / 3)) * rho_warm
-        N_warm_cyl = int(M_warm_cyl / (M_gas / N_gas))
-        x_warm = (
-            boxsize_cyl * np.random.rand(N_warm_cyl, 3) - boxsize_cyl / 2
-        )  # will be recentered later
-        x_warm = x_warm[
-            ~ind_in_cylinder(x_warm, L_cyl, R_cyl)
-        ]  # keep only warm gas outside the cylinder
-        # print("N_warm_cyl: %g N_warm_cyl_kept %g "%(N_warm_cyl,len(x_warm)))
-        N_warm_cyl = len(x_warm)
-        x_cyl = np.concatenate([x_cyl, x_warm])
-        v_cyl = np.concatenate([v_cyl, np.zeros((N_warm, 3))])
-
+    
 else:
     N_warm = 0
 
@@ -348,8 +328,6 @@ if diffuse_gas:
 h = (32 * mgas / rho) ** (1.0 / 3)
 
 x += boxsize / 2  # cloud is always centered at (boxsize/2,boxsize/2,boxsize/2)
-if makecylinder:
-    x_cyl += boxsize_cyl / 2
 
 
 
@@ -364,7 +342,7 @@ F["Header"].attrs["NumPart_ThisFile"] = [
     0,
     0,
     0,
-    (1 if M_star > 0 else 0),
+    0,
 ]
 F["Header"].attrs["NumPart_Total"] = [
     len(mgas),
@@ -372,7 +350,7 @@ F["Header"].attrs["NumPart_Total"] = [
     0,
     0,
     0,
-    (1 if M_star > 0 else 0),
+    0,
 ]
 F["Header"].attrs["BoxSize"] = boxsize
 F["Header"].attrs["Time"] = 0.0
