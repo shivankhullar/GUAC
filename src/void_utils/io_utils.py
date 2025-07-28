@@ -7,6 +7,40 @@ Date: March 2025
 
 from generic_utils.fire_utils import *
 import generic_utils.constants as const
+from void_utils.calculate_void_quants import *
+
+
+
+import glob
+import numpy as np
+#import yt
+import h5py
+from meshoid import Meshoid
+#matplotlib.use('Agg')
+from matplotlib import pyplot as plt
+from matplotlib import colors
+import colorcet as cc
+from matplotlib.cm import get_cmap
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
+import matplotlib.font_manager as fm
+from scipy import interpolate 
+#import pandas as pd
+
+from scipy.spatial import Voronoi, ConvexHull
+from scipy.spatial import cKDTree
+
+#from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import numpy as np
+import cv2
+from scipy import ndimage
+import scipy.ndimage as ndimage
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+from skimage import measure
+from tqdm import tqdm
+import pickle
+import os
+
 
 
 
@@ -182,3 +216,36 @@ class VoidChain():
             print ('Cloud not found :(')
             
 
+
+def load_linked_void_data(params, lifetime_cutoff=10, run_new_calculation=True, void_list=None):
+    """
+    Load linked void data from a pickle file.
+    Parameters:
+        params: Params object containing path and other parameters.
+        lifetime_cutoff: int, optional, default=0
+            The lifetime cutoff for the linked voids to be loaded.
+    Returns:
+        linked_void_data_list: list
+            A list of linked void data dictionaries.
+    """
+    output_dir = os.path.join(params.path, "linked_void_data")
+    filename = f"linked_void_data_list_{lifetime_cutoff}.pkl"
+    filepath = os.path.join(output_dir, filename)
+    try:
+        with open(filepath, "rb") as f:
+            linked_void_data_list = pickle.load(f)
+        print(f"Loaded {len(linked_void_data_list)} linked voids from {filepath}.")
+    except FileNotFoundError:
+        print (f"File {filepath} not found. Running new calculation instead.")
+        if run_new_calculation and void_list is not None:
+            print ("Computing linked void data...")
+            linked_void_data_list = compute_linked_void_data_list(params, void_list, lifetime_cutoff)
+            print(f"New linked void data calculated and saved to {filepath}.")
+            linked_void_data_list = load_linked_void_data(params, lifetime_cutoff=lifetime_cutoff, run_new_calculation=False, void_list=void_list)
+        else:
+            linked_void_data_list = []
+            print(f"Returning an empty list, because no new calculation was requested. Maybe provide the void list")
+        #print(f"File {filepath} not found. Returning an empty list.")
+        #linked_void_data_list = []
+    
+    return linked_void_data_list

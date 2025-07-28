@@ -13,6 +13,9 @@ from void_utils.io_utils import *
 
 
 
+from tqdm import tqdm
+
+
 
 def get_contour_centroid(contour):
     """
@@ -53,6 +56,7 @@ def get_effective_radius(contour):
 
 
 def get_linked_void_quants(params, void_list):
+    from void_utils.io_utils import get_void_data_hdf5
     #count = 0
     linked_void = {}
     linked_void['name'] = void_list[0]
@@ -80,20 +84,75 @@ def get_linked_void_quants(params, void_list):
     linked_void['effective_radius'] = np.median(effective_radius)
     linked_void['radius_time'] = effective_radius
     linked_void['center_time'] = void_centers
+    linked_void['maximum_radius'] = np.max(effective_radius)
 
     return linked_void
 
 
+# We will apply some selection criteria to the linked voids to identify the ones where the radius is increasing over time.
+def select_voids(linked_void_data_list):
+    selected_voids = []
+    for i in range (0, len(linked_void_data_list)):# in linked_void_data_list:
+        void_data = linked_void_data_list[i]
+        radius_time = void_data['radius_time']
+        if len(radius_time) < 20:
+            continue
+        # Check if the radius is increasing over time
+        # Using a loose criterion first
+        if radius_time[-1] < 1.5 * radius_time[0]:
+            continue
+        
+        # Avoid voids that have a decreasing radius at any point in time
+        #if np.any(np.diff(radius_time) < 0):
+        #    continue
 
-        #void_max_x, void_max_y = np.max(contour[:, 0]), np.max(contour[:, 1])
-        #void_min_x, void_min_y = np.min(contour[:, 0]), np.min(contour[:, 1])
+        # Avoid voids that have a large increase in radius between consecutive snapshots
+        if np.any(np.diff(radius_time) > 0.5 * radius_time[:-1]):
+            continue
 
-        #void_center = np.array([void_min_x + (void_max_x - void_min_x)/2, void_min_y + (void_max_y - void_min_y)/2])
-        ##define a box size around the void contour
-        #box_size = max(void_max_x - void_min_x, void_max_y - void_min_y)
+        else:
+            selected_voids.append(void_data)
 
-        #if box_size < 2:
-        #    box_size = 2
+        # This is a strict criterion
+        #if np.all(np.diff(radius_time) > 0):
+        #    selected_voids.append(void_data)
+    return selected_voids
 
-        #box_size_multiplier = 2
-        #box_size *= box_size_multiplier
+
+
+def compute_linked_void_data_list(params, linked_voids_list, lifetime_cutoff, save_file=True):
+    """
+    Compute the linked void data for a list of voids.
+    Parameters:
+        params: Parameters object containing simulation parameters.
+        void_list: List of void names to process.
+        lifetime_cutoff: Minimum number of snapshots a void must be present in to be considered.
+        save_file: Whether to save the computed data to a file.
+    Returns:
+        linked_void_data_list: List of dictionaries containing linked void data.
+    """
+
+    linked_void_data_list = []
+    for void_list in tqdm(linked_voids_list, desc="Processing linked voids"):
+        linked_void_data_list.append(get_linked_void_quants(params, void_list))
+
+
+    if save_file:
+        output_dir = os.path.join(params.path, "linked_void_data")
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Save the data
+        filename = f"linked_void_data_list_{lifetime_cutoff}.pkl"
+        filepath = os.path.join(output_dir, filename)
+        with open(filepath, "wb") as f:
+            pickle.dump(linked_void_data_list, f)
+        print(f"Linked void data saved successfully to {filepath}.")
+    else:
+        print("Linked void data not saved to file.")
+
+    return linked_void_data_list
+
+
+
+
+#def calculate_SNe_within_void_countours():
