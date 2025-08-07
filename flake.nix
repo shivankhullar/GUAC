@@ -15,7 +15,7 @@
             allowUnfree = true;
           };
         };
-		python = pkgs.python311Packages;
+		python = pkgs.python312Packages;
 
         meshoid = python.buildPythonPackage rec {
           pname = "meshoid";
@@ -27,7 +27,7 @@
           #  sha256 = "sha256-13u4zOVZMYD5z7smsE40V8MYVv9K+bWW+G8kJzbL/bM=";
           #};
 
-          src = pkgs.python311Packages.fetchPypi{
+          src = python.fetchPypi{
             inherit pname version;
             sha256 = "sha256-13u4zOVZMYD5z7smsE40V8MYVv9K+bWW+G8kJzbL/bM=";
           };
@@ -37,10 +37,51 @@
 			scipy
             astropy
             numba
+			h5py
+			pyerfa
           ];
-		  buildPhase = ''
-            ${pkgs.python311Packages.python.interpreter} setup.py build
+		  preBuild = ''
+            export PYTEST_DOCTESTPLUS_SKIP_TESTS=1
           '';
+		  doCheck = false;
+		  buildPhase = ''
+            ${python.python.interpreter} setup.py build
+          '';
+		    installPhase = ''
+    runHook preInstall
+    # Create target directory
+    mkdir -p "$out/${python.python.sitePackages}"
+    
+    # Find and copy the built package
+    if [ -d build ]; then
+      # Find the actual build directory
+      build_dir=$(find build -maxdepth 1 -type d -name 'lib*' | head -1)
+      
+      if [ -n "$build_dir" ]; then
+        echo "Found build directory: $build_dir"
+        cp -r "$build_dir"/* "$out/${python.python.sitePackages}/"
+      else
+        echo "ERROR: No build directory found!" >&2
+        exit 1
+      fi
+    else
+      echo "ERROR: Build directory doesn't exist!" >&2
+      exit 1
+    fi
+    runHook postInstall
+  '';
+          #installPhase = ''
+          #  runHook preInstall
+          #  ${python.python.interpreter} setup.py install --prefix=$out
+          #  mkdir -p $out/${python.python.sitePackages}
+		  #  echo "HERE IS OUT: $out"
+		  #  echo "LS: $(ls)"
+		  #  echo "HERE IS SITEPACKAGES: ${python.python.sitePackages}"
+		  #  ${python.python.interpreter} -c "import src.meshoid" && echo "Success in importing"
+          #  cp -r build/lib.* $out/${python.python.sitePackages}
+          #  runHook postInstall
+          #'';
+		  pythonImportsCheck = [ "meshoid" ];
         };
         pfh_python = python.buildPythonPackage rec {
           pname = "pfh_python";
@@ -63,11 +104,11 @@
           matplotlib
           numpy
           scipy
-          docopt
+          #docopt
           #pfh_python
           meshoid
           glob2
-          jupyterlab  # Include JupyterLab in pythonEnv
+          #jupyterlab  # Include JupyterLab in pythonEnv
           ipykernel   # Include ipykernel to register kernels        
         ]);
       in
