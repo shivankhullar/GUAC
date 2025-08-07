@@ -22,11 +22,6 @@
           version = "1.48.5";
 		  format = "other";
 
-          #src = pkgs.fetchurl {
-          #  url = "https://files.pythonhosted.org/packages/path/to/meshoid-${version}-py3-none-any.whl";
-          #  sha256 = "sha256-13u4zOVZMYD5z7smsE40V8MYVv9K+bWW+G8kJzbL/bM=";
-          #};
-
           src = python.fetchPypi{
             inherit pname version;
             sha256 = "sha256-13u4zOVZMYD5z7smsE40V8MYVv9K+bWW+G8kJzbL/bM=";
@@ -40,47 +35,32 @@
 			h5py
 			pyerfa
           ];
-		  preBuild = ''
-            export PYTEST_DOCTESTPLUS_SKIP_TESTS=1
-          '';
-		  doCheck = false;
 		  buildPhase = ''
             ${python.python.interpreter} setup.py build
           '';
-		    installPhase = ''
-    runHook preInstall
-    # Create target directory
-    mkdir -p "$out/${python.python.sitePackages}"
-    
-    # Find and copy the built package
-    if [ -d build ]; then
-      # Find the actual build directory
-      build_dir=$(find build -maxdepth 1 -type d -name 'lib*' | head -1)
-      
-      if [ -n "$build_dir" ]; then
-        echo "Found build directory: $build_dir"
-        cp -r "$build_dir"/* "$out/${python.python.sitePackages}/"
-      else
-        echo "ERROR: No build directory found!" >&2
-        exit 1
-      fi
-    else
-      echo "ERROR: Build directory doesn't exist!" >&2
-      exit 1
-    fi
-    runHook postInstall
-  '';
-          #installPhase = ''
-          #  runHook preInstall
-          #  ${python.python.interpreter} setup.py install --prefix=$out
-          #  mkdir -p $out/${python.python.sitePackages}
-		  #  echo "HERE IS OUT: $out"
-		  #  echo "LS: $(ls)"
-		  #  echo "HERE IS SITEPACKAGES: ${python.python.sitePackages}"
-		  #  ${python.python.interpreter} -c "import src.meshoid" && echo "Success in importing"
-          #  cp -r build/lib.* $out/${python.python.sitePackages}
-          #  runHook postInstall
-          #'';
+		  installPhase = ''
+            runHook preInstall
+            # Create target directory
+            mkdir -p "$out/${python.python.sitePackages}"
+            
+            # Find and copy the built package
+            if [ -d build ]; then
+              # Find the actual build directory
+              build_dir=$(find build -maxdepth 1 -type d -name 'lib*' | head -1)
+              
+              if [ -n "$build_dir" ]; then
+                echo "Found build directory: $build_dir"
+                cp -r "$build_dir"/* "$out/${python.python.sitePackages}/"
+              else
+                echo "ERROR: No build directory found!" >&2
+                exit 1
+              fi
+            else
+              echo "ERROR: Build directory doesn't exist!" >&2
+              exit 1
+            fi
+            runHook postInstall
+            '';
 		  pythonImportsCheck = [ "meshoid" ];
         };
         pfh_python = python.buildPythonPackage rec {
@@ -118,7 +98,7 @@
             pythonEnv
           ];
 		  shellHook = ''
-		  python -c "import meshoid" || exit
+		    echo "Welcome to GUAC nix shell!"
 		  '';
         };
       }
