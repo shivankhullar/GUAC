@@ -66,26 +66,73 @@
         pfh_python = python.buildPythonPackage rec {
           pname = "pfh_python";
           version = "2022-10-28";
-		  format = "wheel";
-          src = pkgs.fetchFromBitbucket {
-            owner = "phopkins";
-            repo = "pfh_python";
+          format = "other";
+          
+          src = pkgs.fetchgit {
+            url = "https://vpustovoit@bitbucket.org/phopkins/pfh_python.git";
             rev = "350be052332316d05bad20e76ebba61275d40cc2";
-            hash = "sha256-rHUY2S+MDXk/qujlCmC2CS3i6i9SOBtf3sBukEDFdBI=";
+            #sha256 = "07syl2qp9jh41nnm3lgqvh2qmpvh0sb0aws88kpx02fv11gxrq7j";
+            hash = "sha256-8uDcXwjbCdDvREhzBZYGcN+KBdz40VGtDQTKdLGgXh8=";
+            #fetchLFS = false;
+            #fetchSubmodules = false;
+            #deepClone = false;
+            #leaveDotGit = false;
           };
-		#  nativeBuildInputs = with python; [ pyproject-api 
-        #                                     flit-core numpy 
-		#									 h5py scipy 
-		#									 matplotlib ];
-
-		};
+        
+          nativeBuildInputs = with pkgs; [
+            gfortran
+            binutils
+            gnumake
+            autoPatchelfHook
+          ];
+        
+          propagatedBuildInputs = with python; [
+            pyproject-hooks
+            flit-core
+            numpy
+            h5py
+            scipy
+            setuptools
+            matplotlib
+          ];
+        
+          ## Set source root explicitly
+          #setSourceRoot = ''
+          #  sourceRoot=$(echo */)
+          #  echo "Source root is: $sourceRoot"
+          #'';
+        
+          installPhase = ''
+            runHook preInstall
+            
+            # Enter source directory
+            #cd "$sourceRoot"
+            
+            # List files to verify script exists
+            echo "Current directory: $PWD"
+            echo "Files in directory:"
+            ls -la
+            
+            # Make script executable if needed
+            chmod +x make_all_pylibs.sh
+            
+            # Execute build script
+            ./make_all_pylibs.sh
+            
+            # Install Python package
+            mkdir -p $out/${python.python.sitePackages}
+            cp -r .  $out/${python.python.sitePackages}/pfh_python
+            
+            runHook postInstall
+          '';
+        };
         pythonEnv = python.python.withPackages (ps: with ps; [
           pandas
           matplotlib
           numpy
           scipy
-          #docopt
-          #pfh_python
+          docopt
+          pfh_python
           meshoid
           glob2
           #jupyterlab  # Include JupyterLab in pythonEnv
@@ -96,6 +143,7 @@
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
             pythonEnv
+			gfortran
           ];
 		  shellHook = ''
 		    echo "Welcome to GUAC nix shell!"
