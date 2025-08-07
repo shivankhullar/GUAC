@@ -81,6 +81,7 @@
         
           nativeBuildInputs = with pkgs; [
             gfortran
+			bash
             binutils
             gnumake
             autoPatchelfHook
@@ -96,28 +97,15 @@
             matplotlib
           ];
         
-          ## Set source root explicitly
-          #setSourceRoot = ''
-          #  sourceRoot=$(echo */)
-          #  echo "Source root is: $sourceRoot"
-          #'';
-        
           installPhase = ''
             runHook preInstall
             
-            # Enter source directory
-            #cd "$sourceRoot"
-            
-            # List files to verify script exists
-            echo "Current directory: $PWD"
-            echo "Files in directory:"
-            ls -la
-            
             # Make script executable if needed
             chmod +x make_all_pylibs.sh
+			export PYDIR=$PWD
             
             # Execute build script
-            ./make_all_pylibs.sh
+            ${pkgs.bash}/bin/bash ./make_all_pylibs.sh
             
             # Install Python package
             mkdir -p $out/${python.python.sitePackages}
@@ -125,6 +113,10 @@
             
             runHook postInstall
           '';
+
+		  prePatch = ''
+		    patchShebangs ./make_all_pylibs
+		  '';
         };
         pythonEnv = python.python.withPackages (ps: with ps; [
           pandas
