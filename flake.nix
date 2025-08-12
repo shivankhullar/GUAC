@@ -63,6 +63,66 @@
             '';
 		  pythonImportsCheck = [ "meshoid" ];
         };
+		ewah_bool_utils = python.buildPythonPackage rec {
+          pname = "ewah_bool_utils";
+          version = "1.3.0";
+          format = "other";
+          
+          src = pkgs.fetchPypi {
+		    inherit pname;
+		    inherit version;
+            sha256 = "sha256-V2gYPccjFJvI6dYYHZO/aYJfZDA0YizCddkZr7X4Rmg=";
+          };
+          nativeBuildInputs = with python; [
+		    setuptools
+            numpy
+		    scipy
+			cython
+            requests
+		    distutils
+            numba
+          ];
+          buildPhase = ''
+              ${python.python.interpreter} setup.py build
+          '';
+          installPhase = ''
+          	runHook preInstall
+          	
+          	# Install Python package
+          	mkdir -p $out/${python.python.sitePackages}
+          	cp -r .  $out/${python.python.sitePackages}/ewah_bool_utils
+          '';
+		  pythonImportsCheck = [ "ewah_bool_utils" ];
+		};
+		yt = python.buildPythonPackage rec {
+          pname = "yt";
+          version = "4.4.1";
+          format = "other";
+          
+          src = pkgs.fetchPypi {
+		    inherit pname;
+		    inherit version;
+            sha256 = "sha256-LfNkJbSDIcojbqY49k++g09dO0fJSM1RmnsEhoYlPCU=";
+          };
+          nativeBuildInputs = with python; [
+		    setuptools
+            numpy
+		    scipy
+            requests
+			ewah_bool_utils
+			distutils
+			mypy
+            numba
+          ];
+          buildPhase = ''
+			  echo "LIST:"
+			  ls
+			  echo "LIST ../:"
+			  ls ../
+              ${python.python.interpreter} setup.py build
+          '';
+		  pythonImportsCheck = [ "yt" ];
+		};
         pfh_python = python.buildPythonPackage rec {
           pname = "pfh_python";
           version = "2022-10-28";
@@ -127,7 +187,8 @@
           pfh_python
           meshoid
           glob2
-          #jupyterlab  # Include JupyterLab in pythonEnv
+		  yt
+          jupyterlab  # Include JupyterLab in pythonEnv
           ipykernel   # Include ipykernel to register kernels        
         ]);
       in
@@ -138,6 +199,9 @@
 			gfortran
           ];
 		  shellHook = ''
+			EXTRAPATH=$(pwd)/src:$(pwd)/scripts
+			export PATH=$PATH:$EXTRAPATH
+			export PYTHONPATH=$PYTHONPATH:$EXTRAPATH
 		    echo "Welcome to GUAC nix shell!"
 		  '';
         };
