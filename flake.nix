@@ -97,8 +97,17 @@
 		yt = python.buildPythonPackage rec {
           pname = "yt";
           version = "4.4.1";
-          format = "other";
+          format = "pyproject";
           
+		  prePatch = ''
+  		    # Add ewah_bool_utils import
+  		    sed -i "/from importlib import resources as importlib_resources/a import ewah_bool_utils" setup.py
+  		    
+  		    # Replace the problematic path lookup
+  		    substituteInPlace setup.py \
+  		      --replace '[os.path.abspath(importlib_resources.files("ewah_bool_utils"))]' \
+  		                '[os.path.abspath(ewah_bool_utils.__path__[0])]'
+  		  '';
           src = pkgs.fetchPypi {
 		    inherit pname;
 		    inherit version;
@@ -110,17 +119,37 @@
 		    scipy
             requests
 			ewah_bool_utils
+			cython
 			distutils
 			mypy
             numba
           ];
-          buildPhase = ''
-			  echo "LIST:"
-			  ls
-			  echo "LIST ../:"
-			  ls ../
-              ${python.python.interpreter} setup.py build
-          '';
+          propagatedBuildInputs = with python; [
+		    setuptools
+            numpy
+		    scipy
+            requests
+			ewah_bool_utils
+			cython
+			distutils
+			mypy
+            numba
+          ];
+		  #propagatedBuildInputs = with python; [
+		  #  ewah_bool_utils
+		  #  numpy
+		  #  scipy
+		  #];
+		  buildInputs = with python; [
+		    ewah_bool_utils
+		  ];
+          #buildPhase = ''
+		  #    echo "LIST:"
+		  #    ls
+		  #    echo "LIST ../:"
+		  #    ls ../
+          #    #${python.python.interpreter} setup.py build
+          #'';
 		  pythonImportsCheck = [ "yt" ];
 		};
         pfh_python = python.buildPythonPackage rec {
