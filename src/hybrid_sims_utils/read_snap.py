@@ -47,8 +47,10 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
     stardata = {}
     if 'PartType5' in F.keys():
         try:
-            for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber", "StellarFormationTime":
-                stardata[field] = F["PartType5"][field][:]#[density_cut]
+            #for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber", "StellarFormationTime":
+            #    stardata[field] = F["PartType5"][field][:]#[density_cut]
+            for field in F['PartType5'].keys():
+                stardata[field] = F["PartType5"][field][:]
 
             for key in F['Header'].attrs.keys():
                 stardata[key] = F['Header'].attrs[key]
