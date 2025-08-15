@@ -124,13 +124,40 @@ def make_cloud_plot(final_gas_coords, final_gas_masses, final_gas_hsmls, final_s
     plt.show()
     plt.close()
 
+def get_center_of_cloud_from_cloud_phinder_data(path_to_hdf5, cloud_num):
+    with h5py.File(path_to_hdf5, "r") as f:
+        cloud_name = f"Cloud{cloud_num}"
+        coords = f[cloud_name]["PartType0"]["Coordinates"]
+        part_ids = f[cloud_name]["PartType0"]["ParticleIDs"]
+        # Find center of the cloud
+        avg_pos = np.mean(coords, axis=0)
+        # Find point closest to the center
+        distances = np.linalg.norm(coords - avg_pos, axis=1)
+        closest_idx = np.argmin(distances)
+        center_pt_idx = part_ids[closest_idx]
+        print(f"Average pos: {avg_pos}")
+        print(f"Closest point has an index of {center_pt_idx}")
+        center_pt_pos = coords[closest_idx]
+        return center_pt_idx, center_pt_pos
+
+
+def add_zeros(num, num_digits):
+    num_str = str(num)
+    while len(num_str) < num_digits:
+        num_str = "0" + num_str
+    return num_str
+
+#########################################
+########### DEFINE PARAMETERS ###########
+#########################################
+
 #path = "/mnt/raid-project/murray/khullar/FIRE-3/"
 path = "/fs/lustre/scratch/vpustovoit/SHIVAN/CCA_DATA/"
+snapshot_num_digits = 3
 start_snap = 6
-last_snap = 6
+last_snap = 10
 linked_filename_prefix = "Linked_Clouds_"
 cloud_num_digits = 4
-snapshot_num_digits = 3
 cloud_prefix = "Cloud"
 hdf5_file_prefix = 'Clouds_'
 #sim = 'm12f_m7e3_MHD_fire3_fireBH_Sep182021_hr_crdiffc690_sdp1e10_gacc31_fa0.5'
@@ -142,6 +169,7 @@ star_data_sub_dir = "StarData/"
 gas_data_sub_dir = "GasData/"
 cph_sub_dir = "CloudPhinderData/"
 r_gal = 25
+sphere_r = 0.2
 h = 0.4
 nmin = 1
 vir = 10
@@ -163,43 +191,64 @@ params = Params(path=path, sub_dir=sub_dir, start_snap=start_snap, last_snap=las
 params.linked_filename = f"{params.path}{params.sub_dir}{params.filename_prefix}n{params.nmin}_alpha{params.vir}_{params.frac_thresh}_{params.start_snap}_{params.last_snap}_names.txt"
 
 
-cloud_nums = np.array([0, 1])
-
-def get_center_of_cloud_from_cloud_phinder_data(path_to_hdf5, cloud_num):
-    with h5py.File(path_to_hdf5, "r") as f:
-        cloud_name = f"Cloud{cloud_num}"
-        coords = f[cloud_name]["PartType0"]["Coordinates"]
-        part_ids = f[cloud_name]["PartType0"]["ParticleIDs"]
-        avg_pos = np.mean(coords, axis=0)
-        distances = np.linalg.norm(coords - avg_pos, axis=1)
-        closest_idx = np.argmin(distances)
-        center_pt_idx = part_ids[closest_idx]
-        print(f"Average pos: {avg_pos}")
-        print(f"Closest point has an index of {center_pt_idx}")
+###########################
+########### MAIN ##########
+###########################
 
 
-path_to_hdf5 = path + sim + "/Clouds_6_n0.05_alpha5.hdf5"
-for i in range(0, len(cloud_nums)):
-    cloud_num = cloud_nums[i]
-    get_center_of_cloud_from_cloud_phinder_data(path_to_hdf5, cloud_num)
-    """
-    selected_snap=6
-    cloud_name = f'Cloud{cloud_num:04d}Snap{selected_snap}'
+# GET SNAPSHOT NUMBER WITH 1ST STAR FORMING
+num_digits = snapshot_num_digits
+for i in range(start_snap, last_snap+1):
+    snap_num = i
+    snap_num_str = add_zeros(i, num_digits)
+    path_to_snap = path + sim + "/snapshot_" + snap_num_str + ".hdf5"
+    with h5py.File(path_to_snap, "r") as f:
+        redshift = f["Header"].attrs["Redshift"]
+        #coords = f["PartType0"]["Coordinates"]
+        #part_ids = f["PartType0"]["ParticleIDs"]
+        print(f"Redshift: {redshift}")
+        if "PartType4" in f.keys():
+            print("Stars found in snapshot {snap_num}")
+            break
+        elif i == last_snap:
+            raise ValueError("No stars found forming")
 
-    chain = CloudChain(cloud_num, selected_snap, params)
-    cnum = chain.cloud_nums[chain.snap_nums.index(selected_snap)]
-    _, _, coords, _, _ = get_cloud_quants_hdf5(cnum, selected_snap, params, no_temps=True, projection=True)
+# GET DATA FROM FIRST-STAR SNAPSHOT
+firs_star_snap = snap_num
+snap_num_str = add_zeros(firs_star_snap, num_digits)
+path_to_snap = path + sim + "/snapshot_" + snap_num_str + ".hdf5"
+with h5py.File(path_to_snap, "r") as f:
+    redshift = f["Header"].attrs["Redshift"]
+    coords = f["PartType0"]["Coordinates"]
+    part_ids = f["PartType0"]["ParticleIDs"]
+    star_coords = f["PartType4"]["Coordinates"]
+    star_part_ids = f["PartType4"]["ParticleIDs"]
+    star_ages = f["PartType4"]["ParticleIDs"]
+max_age_idx = np.argmax(star_ages)
+coord_of_first_star = star_coords[max_age_idx]
 
-    median_gas_pos = np.median(coords, axis=0)
-    #print(f"Median gas position: {median_gas_pos}")
+# GET IDS OF GAS PARTICLES WITHIN sphere_r OF THE FIRST STAR
+x_mean, y_mean, z_mean = coord_of_first_star
+box_size = sphere_r
+inds_x = np.where((coords[:,0]>x_mean-box_size/2)&(coords[:,0]<x_mean+box_size/2))[0]
+inds_y = np.where((coords[:,1]>y_mean-box_size/2)&(coords[:,1]<y_mean+box_size/2))[0]
+inds_z = np.where((coords[:,2]>z_mean-box_size/2)&(coords[:,2]<z_mean+box_size/2))[0]
+final_inds = np.intersect1d(np.intersect1d(inds_x, inds_y), inds_z)
+if len(final_inds) == 0:
+    print (f"Snapshot {snap_num} has no valid coordinates. Weird.")
+    #continue
+coords_x = np.take(coords[:,0], final_inds)
+coords_y = np.take(coords[:,1], final_inds)
+coords_z = np.take(coords[:,2], final_inds)
+final_gas_coords = np.array([coords_x, coords_y, coords_z]).T
+close_gas_coords = final_gas_coords[np.linalg.norm(final_gas_coords - custom_pos, axis=1) < sphere_r]
+tracked_close_gas_pIDs = snap_data_pID_array[np.linalg.norm(coords - custom_pos, axis=1) < sphere_r]
+tracked_close_gas_pIDs = np.unique(tracked_close_gas_pIDs, axis=0)
 
-    gal_center = get_galaxy_centre(params, selected_snap)
-    proj_matrix = get_galaxy_proj_matrix(params, selected_snap)
+# SAVE IDS TO A FILE
+save_dir = f"{path}{sim}/"
+os.makedirs(save_dir, exist_ok=True)
+np.save(f"{save_dir}/cloud_tracked_pIDs.npy", tracked_close_gas_pIDs)
+print(f"Tracked pIDs saved to {save_dir}/cloud_tracked_pIDs.npy")
 
-    gal_center_proj = np.matmul(proj_matrix, gal_center)
-    print(f"Galaxy center projected coordinates: {gal_center_proj}")
 
-    gal_dist = np.linalg.norm(gal_center_proj - median_gas_pos)
-    print(f"Distance from galaxy center to {cloud_name}: {gal_dist:.2f} kpc")
-
-    """
