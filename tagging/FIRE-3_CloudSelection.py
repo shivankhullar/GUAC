@@ -24,7 +24,7 @@ from matplotlib.colors import LogNorm
 from matplotlib import colors
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import matplotlib.font_manager as fm
-import os
+import os, sys
 
 import colorcet as cc
 
@@ -147,12 +147,18 @@ def add_zeros(num, num_digits):
         num_str = "0" + num_str
     return num_str
 
+def print_arr_info(array):
+    print(f"Array shape: {array.shape}")
+    print(f"Array dtype: {array.dtype}")
+    print(f"Array contents: {array}")
 #########################################
 ########### DEFINE PARAMETERS ###########
 #########################################
 
 #path = "/mnt/raid-project/murray/khullar/FIRE-3/"
-path = "/fs/lustre/scratch/vpustovoit/SHIVAN/CCA_DATA/"
+path = sys.argv[1]
+sim = sys.argv[2]
+output = sys.argv[3]
 snapshot_num_digits = 3
 start_snap = 6
 last_snap = 10
@@ -161,7 +167,6 @@ cloud_num_digits = 4
 cloud_prefix = "Cloud"
 hdf5_file_prefix = 'Clouds_'
 #sim = 'm12f_m7e3_MHD_fire3_fireBH_Sep182021_hr_crdiffc690_sdp1e10_gacc31_fa0.5'
-sim = 'm12f'
 age_cut = 5
 dat_file_header_size = 11
 snapshot_prefix = "Snap"
@@ -224,28 +229,38 @@ with h5py.File(path_to_snap, "r") as f:
     star_coords = f["PartType4"]["Coordinates"]
     star_part_ids = f["PartType4"]["ParticleIDs"]
     star_ages = f["PartType4"]["ParticleIDs"]
-max_age_idx = np.argmax(star_ages)
-coord_of_first_star = star_coords[max_age_idx]
+    max_age_idx = np.argmax(star_ages)
+    coord_of_first_star = star_coords[max_age_idx]
 
-# GET IDS OF GAS PARTICLES WITHIN sphere_r OF THE FIRST STAR
-x_mean, y_mean, z_mean = coord_of_first_star
-box_size = sphere_r
-inds_x = np.where((coords[:,0]>x_mean-box_size/2)&(coords[:,0]<x_mean+box_size/2))[0]
-inds_y = np.where((coords[:,1]>y_mean-box_size/2)&(coords[:,1]<y_mean+box_size/2))[0]
-inds_z = np.where((coords[:,2]>z_mean-box_size/2)&(coords[:,2]<z_mean+box_size/2))[0]
-final_inds = np.intersect1d(np.intersect1d(inds_x, inds_y), inds_z)
-if len(final_inds) == 0:
-    print (f"Snapshot {snap_num} has no valid coordinates. Weird.")
-    #continue
-coords_x = np.take(coords[:,0], final_inds)
-coords_y = np.take(coords[:,1], final_inds)
-coords_z = np.take(coords[:,2], final_inds)
-final_gas_coords = np.array([coords_x, coords_y, coords_z]).T
-close_gas_coords = final_gas_coords[np.linalg.norm(final_gas_coords - custom_pos, axis=1) < sphere_r]
-tracked_close_gas_pIDs = snap_data_pID_array[np.linalg.norm(coords - custom_pos, axis=1) < sphere_r]
-tracked_close_gas_pIDs = np.unique(tracked_close_gas_pIDs, axis=0)
+    # GET IDS OF GAS PARTICLES WITHIN sphere_r OF THE FIRST STAR
+    x_mean, y_mean, z_mean = coord_of_first_star
+    box_size = f["Header"].attrs["BoxSize"]
+    inds_x = np.where((coords[:,0]>x_mean-box_size/2)&(coords[:,0]<x_mean+box_size/2))[0]
+    inds_y = np.where((coords[:,1]>y_mean-box_size/2)&(coords[:,1]<y_mean+box_size/2))[0]
+    inds_z = np.where((coords[:,2]>z_mean-box_size/2)&(coords[:,2]<z_mean+box_size/2))[0]
+    final_inds = np.intersect1d(np.intersect1d(inds_x, inds_y), inds_z)
+    if len(final_inds) == 0:
+        print (f"Snapshot {snap_num} has no valid coordinates. Weird.")
+        #continue
+    coords_x = np.take(coords[:,0], final_inds)
+    coords_y = np.take(coords[:,1], final_inds)
+    coords_z = np.take(coords[:,2], final_inds)
+    print_arr_info(coords_x)
+    final_gas_coords = np.array([coords_x, coords_y, coords_z]).T
+    print_arr_info(final_gas_coords)
+    custom_pos = coord_of_first_star
+    print_arr_info(custom_pos)
+    #sphere_mask = np.linalg.norm(final_gas_coords - custom_pos, axis=1) < sphere_r
+    #close_gas_coords = final_gas_coords[sphere_mask]
+    #tracked_close_gas_pIDs = part_ids[final_inds][sphere_mask] 
+    close_gas_coords = final_gas_coords[np.linalg.norm(final_gas_coords - custom_pos, axis=1) < sphere_r]
+    tracked_close_gas_pIDs = part_ids[np.linalg.norm(coords - custom_pos, axis=1) < sphere_r]
+    print_arr_info(close_gas_coords)
+    print_arr_info(tracked_close_gas_pIDs)
+    tracked_close_gas_pIDs = np.unique(tracked_close_gas_pIDs, axis=0)
 
 # SAVE IDS TO A FILE
+print("Time to save!")
 save_dir = f"{path}{sim}/"
 os.makedirs(save_dir, exist_ok=True)
 np.save(f"{save_dir}/cloud_tracked_pIDs.npy", tracked_close_gas_pIDs)
