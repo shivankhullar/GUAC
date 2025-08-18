@@ -24,7 +24,7 @@ from matplotlib.colors import LogNorm
 from matplotlib import colors
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import matplotlib.font_manager as fm
-import os, sys
+import os, sys, re, glob
 
 import colorcet as cc
 
@@ -151,6 +151,36 @@ def print_arr_info(array):
     print(f"Array shape: {array.shape}")
     print(f"Array dtype: {array.dtype}")
     print(f"Array contents: {array}")
+
+def find_snapshot_range(directory):
+    # List all files in directory
+    all_files = os.listdir(directory)
+    
+    # Filter files matching snapshot pattern (digits only)
+    snapshot_files = []
+    pattern = re.compile(r'^snapshot_(\d+)\.hdf5$')
+    
+    for f in all_files:
+        match = pattern.match(f)
+        if match:
+            snapshot_id = int(match.group(1))  # Convert digits to integer
+            snapshot_files.append((snapshot_id, f))
+    
+    if not snapshot_files:
+        return None  # No snapshots found
+    
+    # Find min/max snapshot IDs
+    first_snap = min(snapshot_files, key=lambda x: x[0])
+    last_snap = max(snapshot_files, key=lambda x: x[0])
+    
+    return {
+        'first_id': first_snap[0],
+        'first_file': first_snap[1],
+        'last_id': last_snap[0],
+        'last_file': last_snap[1]
+    }
+
+
 #########################################
 ########### DEFINE PARAMETERS ###########
 #########################################
@@ -158,50 +188,28 @@ def print_arr_info(array):
 #path = "/mnt/raid-project/murray/khullar/FIRE-3/"
 path = sys.argv[1]
 sim = sys.argv[2]
-output = sys.argv[3]
+output = int(sys.argv[3])
+sphere_r = float(sys.argv[4])
+
+if output == 0:
+    output = ""
+else:
+    output = "/output"
+
+
+path_to_snaps = os.path.join(path, sim, output)
 snapshot_num_digits = 3
-start_snap = 6
-last_snap = 10
-linked_filename_prefix = "Linked_Clouds_"
-cloud_num_digits = 4
-cloud_prefix = "Cloud"
-hdf5_file_prefix = 'Clouds_'
-#sim = 'm12f_m7e3_MHD_fire3_fireBH_Sep182021_hr_crdiffc690_sdp1e10_gacc31_fa0.5'
-age_cut = 5
-dat_file_header_size = 11
-snapshot_prefix = "Snap"
-star_data_sub_dir = "StarData/"
-gas_data_sub_dir = "GasData/"
-cph_sub_dir = "CloudPhinderData/"
-r_gal = 25
-sphere_r = 0.2
-h = 0.4
-nmin = 1
-vir = 10
 
-threshold = '0.5'
-frac_thresh = 'thresh' + threshold
-sub_dir = f"CloudPhinderData/n{nmin}_alpha{vir}/"
-vels_sub_dir = 'vel_sub/'
-gal_quants_sub_dir = 'gal_quants/'
-
-params = Params(path=path, sub_dir=sub_dir, start_snap=start_snap, last_snap=last_snap,
-                filename_prefix=linked_filename_prefix, cloud_prefix=cloud_prefix,
-                hdf5_file_prefix=hdf5_file_prefix, frac_thresh=frac_thresh, sim=sim,
-                r_gal=r_gal, h=h, gal_quants_sub_dir=gal_quants_sub_dir, vels_sub_dir=vels_sub_dir,
-                phinder_sub_dir=cph_sub_dir, age_cut=age_cut,
-                dat_file_header_size=dat_file_header_size, nmin=nmin, vir=vir,
-                cloud_num_digits=cloud_num_digits, snapshot_num_digits=snapshot_num_digits, verbose=False)
-
-params.linked_filename = f"{params.path}{params.sub_dir}{params.filename_prefix}n{params.nmin}_alpha{params.vir}_{params.frac_thresh}_{params.start_snap}_{params.last_snap}_names.txt"
-
+snaps_range = find_snapshot_range(path_to_snaps)
+start_snap = snaps_range['first_id']
+last_snap = snaps_range['last_id']
 
 ###########################
 ########### MAIN ##########
 ###########################
 
-
 # GET SNAPSHOT NUMBER WITH 1ST STAR FORMING
+print(f"Obtaining snapshots from {path_to_snaps}...")
 num_digits = snapshot_num_digits
 for i in range(start_snap, last_snap+1):
     snap_num = i
@@ -209,8 +217,6 @@ for i in range(start_snap, last_snap+1):
     path_to_snap = path + sim + "/snapshot_" + snap_num_str + ".hdf5"
     with h5py.File(path_to_snap, "r") as f:
         redshift = f["Header"].attrs["Redshift"]
-        #coords = f["PartType0"]["Coordinates"]
-        #part_ids = f["PartType0"]["ParticleIDs"]
         print(f"Redshift: {redshift}")
         if "PartType4" in f.keys():
             print("Stars found in snapshot {snap_num}")
@@ -218,52 +224,63 @@ for i in range(start_snap, last_snap+1):
         elif i == last_snap:
             raise ValueError("No stars found forming")
 
-# GET DATA FROM FIRST-STAR SNAPSHOT
-firs_star_snap = snap_num
-snap_num_str = add_zeros(firs_star_snap, num_digits)
-path_to_snap = path + sim + "/snapshot_" + snap_num_str + ".hdf5"
-with h5py.File(path_to_snap, "r") as f:
-    redshift = f["Header"].attrs["Redshift"]
-    coords = f["PartType0"]["Coordinates"]
-    part_ids = f["PartType0"]["ParticleIDs"]
-    star_coords = f["PartType4"]["Coordinates"]
-    star_part_ids = f["PartType4"]["ParticleIDs"]
-    star_ages = f["PartType4"]["ParticleIDs"]
-    max_age_idx = np.argmax(star_ages)
-    coord_of_first_star = star_coords[max_age_idx]
+def get_first_star_pos(coords, star_coords, max_age_idx, sphere_r):
+    custom_pos = star_coords[max_age_idx]
+    min_norm = min(np.linalg.norm(coords - custom_pos, axis=1))
+    print(f"Min norm is: {min_norm}")
+    if min_norm > sphere_r:
+        #if max_age_idx == sorted_indices[-1]:
+        #    raise ValueError("No stars in the region of interest for some reason")
+        return 0
+    return custom_pos
 
-    # GET IDS OF GAS PARTICLES WITHIN sphere_r OF THE FIRST STAR
-    x_mean, y_mean, z_mean = coord_of_first_star
-    box_size = f["Header"].attrs["BoxSize"]
-    inds_x = np.where((coords[:,0]>x_mean-box_size/2)&(coords[:,0]<x_mean+box_size/2))[0]
-    inds_y = np.where((coords[:,1]>y_mean-box_size/2)&(coords[:,1]<y_mean+box_size/2))[0]
-    inds_z = np.where((coords[:,2]>z_mean-box_size/2)&(coords[:,2]<z_mean+box_size/2))[0]
-    final_inds = np.intersect1d(np.intersect1d(inds_x, inds_y), inds_z)
-    if len(final_inds) == 0:
-        print (f"Snapshot {snap_num} has no valid coordinates. Weird.")
-        #continue
-    coords_x = np.take(coords[:,0], final_inds)
-    coords_y = np.take(coords[:,1], final_inds)
-    coords_z = np.take(coords[:,2], final_inds)
-    print_arr_info(coords_x)
-    final_gas_coords = np.array([coords_x, coords_y, coords_z]).T
-    print_arr_info(final_gas_coords)
-    custom_pos = coord_of_first_star
-    print_arr_info(custom_pos)
-    #sphere_mask = np.linalg.norm(final_gas_coords - custom_pos, axis=1) < sphere_r
-    #close_gas_coords = final_gas_coords[sphere_mask]
-    #tracked_close_gas_pIDs = part_ids[final_inds][sphere_mask] 
-    close_gas_coords = final_gas_coords[np.linalg.norm(final_gas_coords - custom_pos, axis=1) < sphere_r]
+def get_tracked_parts_ids(coords, custom_pos, part_ids, sphere_r):
+    close_gas_coords = coords[np.linalg.norm(coords - custom_pos, axis=1) < sphere_r]
     tracked_close_gas_pIDs = part_ids[np.linalg.norm(coords - custom_pos, axis=1) < sphere_r]
-    print_arr_info(close_gas_coords)
-    print_arr_info(tracked_close_gas_pIDs)
+    #close_gas_coords = np.array(close_gas_coords)
     tracked_close_gas_pIDs = np.unique(tracked_close_gas_pIDs, axis=0)
+    return tracked_close_gas_pIDs
 
-# SAVE IDS TO A FILE
+# GET DATA FROM FIRST-STAR SNAPSHOT
+first_star_snap = snap_num
+snap_num_str = add_zeros(first_star_snap, num_digits)
+path_to_snap = path_to_snaps + "/snapshot_" + snap_num_str + ".hdf5"
+loadsnap = lambda array, parttype, snapno : np.array(load_from_snapshot.load_from_snapshot(array, parttype, path_to_snaps, snapno, units_to_physical=True))
+loadsnap_first = lambda array, parttype : loadsnap(array, parttype, first_star_snap)
+loadsnap_prev = lambda array, parttype : loadsnap(array, parttype, first_star_snap-1)
+
+with h5py.File(path_to_snap, "r") as f:
+    coords        = loadsnap_first("Coordinates", 0)
+    part_ids      = loadsnap_first("ParticleIDs", 0)
+    star_coords   = loadsnap_first("Coordinates", 4)
+    star_part_ids = loadsnap_first("ParticleIDs", 4)
+    star_ages     = loadsnap_first("StellarFormationTime", 4)
+    max_age_idx = np.argmax(star_ages)
+    custom_pos = get_first_star_pos(coords, star_coords, max_age_idx, sphere_r)
+    first_star_id = -1
+    if custom_pos == 0:
+        first_star_id = star_part_ids[max_age_idx]
+        print(f"No gas particles were found within {sphere_r} of the first star.")
+        print(f"Obtaining coordinates from the previous snapshot...")
+    else:
+        tracked_IDs = get_tracked_parts_ids(coords, custom_pos, part_ids, sphere_r)
+
+if first_star_id != -1:
+    with h5py.File(path_to_snap, "r") as f:
+        coords         = loadsnap_prev("Coordinates", 0)
+        part_ids       = loadsnap_prev("ParticleIDs", 0)
+        max_age_idx = np.where(part_ids == first_star_id)[0][0]
+        custom_pos = get_first_star_pos(coords, coords, max_age_idx, sphere_r)
+        tracked_IDs = get_tracked_parts_ids(coords, custom_pos, part_ids, sphere_r)
+        if len(tracked_IDs) <= 1:
+            raise ValueError("Something is wrong, no gas particles were found within {sphere_r} of the particle in the snapshot")
+        print(f"Found {len(tracked_IDs)} trackable gas particles in the previous snapshot!")
+
+# SAVE IDS TO A BINARY FILE
 print("Time to save!")
 save_dir = f"{path}{sim}/"
 os.makedirs(save_dir, exist_ok=True)
-np.save(f"{save_dir}/cloud_tracked_pIDs.npy", tracked_close_gas_pIDs)
+np.save(f"{save_dir}/cloud_tracked_pIDs.npy", tracked_IDs)
 print(f"Tracked pIDs saved to {save_dir}/cloud_tracked_pIDs.npy")
-
-
+with open('snapnum.txt', 'w') as f:
+    f.write(str(first_star_snap-1))
