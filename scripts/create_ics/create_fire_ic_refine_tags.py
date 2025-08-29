@@ -27,6 +27,7 @@ Options:
     --ic_file_name=<ic_file_name>                       Name of the IC file to be created [default: ic_refinement_tags]
     --snap_num=<snap_num>                               Snapshot number to create the IC file for [default: 610]
     --load_file_path=<load_file_path>                   Path to the file containing pIDs to tag [default: ./]
+    --full_load_file_path=<full_load_file_path>         Full path to the file containing pIDs to tag [default: ./]
     --load_file_name=<load_file_name>                   Name of the file containing pIDs to tag [default: pIDs_to_tag.npy]
     --file_parts=<file_parts>                           Number of parts in the snapshot file [default: 1]
 """
@@ -41,6 +42,12 @@ import numpy as np
 import os
 import yt
 from yt.utilities.cosmology import Cosmology
+
+def add_zeros(num, num_digits):
+    num_str = str(num)
+    while len(num_str) < num_digits:
+        num_str = "0" + num_str
+    return num_str
 
 
 
@@ -57,10 +64,15 @@ def load_pIDs_to_tag_from_file(params, load_file_path=None, load_file_name=None)
     tracked_pID_array = np.load(load_file_path)
     return tracked_pID_array
 
+def load_pIDs_to_tag_from_file_by_full_path(full_load_file_path):
+
+    tracked_pID_array = np.load(full_load_file_path)
+    return tracked_pID_array
 
 
 
-def create_hdf5_file_flag_based_refinement(snap_num, params, ic_path, ic_file_name, load_file_path=None, load_file_name=None, file_parts=4, snapdir_flag=False):
+
+def create_hdf5_file_flag_based_refinement(snap_num, params, ic_path, ic_file_name, load_file_path=None, load_file_name=None, file_parts=4, snapdir_flag=False, full_load_file_path=None):
     """
     This is a function to create an hdf5 file with the tags on particles which are to be used for calculating the COM of the refinement region.
     Inputs:
@@ -69,12 +81,14 @@ def create_hdf5_file_flag_based_refinement(snap_num, params, ic_path, ic_file_na
     Outputs:
         None
     """
+    nowrite=False
     #parts = file_parts
     header_data_dict_list = []
     gas_data_dict_list = []
     star_data_dict_list = []
     dm_data_dict_list = []
     collisionless_data_dict_list = []
+    snap_num = add_zeros(snap_num, 3)
 
     if snapdir_flag:
         print ('Reading files from snapdir...')
@@ -140,93 +154,126 @@ def create_hdf5_file_flag_based_refinement(snap_num, params, ic_path, ic_file_na
 
 
     # Now we can create the new hdf5 file with the SMBH particle (PartType3) added
-    print ('Writing to file now ....')
+    if not nowrite:
+        print ('Writing to file now ....')
 
-    if not os.path.exists(ic_path):
-        os.makedirs(ic_path)
+        if not os.path.exists(ic_path):
+            os.makedirs(ic_path)
 
-    file_name = ic_path+ic_file_name+".hdf5"
-    #'snapshot_{snap_num}.hdf5'.format(snap_num=snap_num)
-    f = h5py.File(file_name, 'w')
-    header = f.create_group('Header')
-    for key in header_data_dict_list[0].keys():
-        if key=='NumPart_ThisFile':
-            if file_parts == 1:
-                arr = header_data_dict_list[0]['NumPart_ThisFile']
+        file_name = ic_path+ic_file_name+".hdf5"
+        #'snapshot_{snap_num}.hdf5'.format(snap_num=snap_num)
+        f = h5py.File(file_name, 'w')
+        header = f.create_group('Header')
+        for key in header_data_dict_list[0].keys():
+            if key=='NumPart_ThisFile':
+                if file_parts == 1:
+                    arr = header_data_dict_list[0]['NumPart_ThisFile']
+                else:
+                    arr = header_data_dict_list[0]['NumPart_ThisFile'] + \
+                            header_data_dict_list[1]['NumPart_ThisFile'] + \
+                                header_data_dict_list[2]['NumPart_ThisFile'] + \
+                                    header_data_dict_list[3]['NumPart_ThisFile']
+                #arr[3] = 1
+                header.attrs.create(key, arr)
             else:
-                arr = header_data_dict_list[0]['NumPart_ThisFile'] + \
-                        header_data_dict_list[1]['NumPart_ThisFile'] + \
-                            header_data_dict_list[2]['NumPart_ThisFile'] + \
-                                header_data_dict_list[3]['NumPart_ThisFile']
-            #arr[3] = 1
-            header.attrs.create(key, arr)
+                header.attrs.create(key, header_data_dict_list[0][key])
+
+
+        print ("Writing PartType0 to file...")
+
+        part0 = f.create_group('PartType0')
+        for key in gas_data_dict_list[0].keys():
+            if gas_data_dict_list[0][key].ndim>1:
+                if file_parts == 1:
+                    arr = gas_data_dict_list[0][key]
+                else:
+                    arr = np.vstack((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
+            else:
+                if file_parts == 1:
+                    arr = gas_data_dict_list[0][key]
+                else:
+                    arr = np.concatenate((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
+            part0.create_dataset(key, data=arr)
+        
+
+        print ("Writing PartType1 to file...")
+        part1 = f.create_group('PartType1')
+        for key in dm_data_dict_list[0].keys():
+            if dm_data_dict_list[0][key].ndim>1:
+                if file_parts == 1:
+                    arr = dm_data_dict_list[0][key]
+                else:
+                    arr = np.vstack((dm_data_dict_list[0][key], dm_data_dict_list[1][key], dm_data_dict_list[2][key], dm_data_dict_list[3][key]))
+            else:
+                if file_parts == 1:
+                    arr = dm_data_dict_list[0][key]
+                else:
+                    arr = np.concatenate((dm_data_dict_list[0][key], dm_data_dict_list[1][key], dm_data_dict_list[2][key], dm_data_dict_list[3][key]))
+            part1.create_dataset(key, data=arr)
+        if file_parts == 1:
+            pIDs = dm_data_dict_list[0]['ParticleIDs']
         else:
-            header.attrs.create(key, header_data_dict_list[0][key])
+            pIDs = np.concatenate((dm_data_dict_list[0][key], dm_data_dict_list[1][key], dm_data_dict_list[2][key], dm_data_dict_list[3][key]))
+        refine_flag_array = np.zeros(len(pIDs))
+        refine_flag_array = refine_flag_array.astype('int32')
+        part1.create_dataset("RefinementFlag", data=refine_flag_array)
 
-
-    print ("Writing PartType0 to file...")
-
-    part0 = f.create_group('PartType0')
-    for key in gas_data_dict_list[0].keys():
-        if gas_data_dict_list[0][key].ndim>1:
-            if file_parts == 1:
-                arr = gas_data_dict_list[0][key]
+        
+        print ("Writing PartType2 to file...")
+        part2 = f.create_group('PartType2')
+        for key in collisionless_data_dict_list[0].keys():
+            if collisionless_data_dict_list[0][key].ndim>1:
+                if file_parts == 1:
+                    arr = collisionless_data_dict_list[0][key]
+                else:
+                    arr = np.vstack((collisionless_data_dict_list[0][key], collisionless_data_dict_list[1][key], collisionless_data_dict_list[2][key], collisionless_data_dict_list[3][key]))
             else:
-                arr = np.vstack((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
+                if file_parts == 1:
+                    arr = collisionless_data_dict_list[0][key]
+                else:
+                    arr = np.concatenate((collisionless_data_dict_list[0][key], collisionless_data_dict_list[1][key], collisionless_data_dict_list[2][key], collisionless_data_dict_list[3][key]))
+            part2.create_dataset(key, data=arr)
+        if file_parts == 1:
+            pIDs = collisionless_data_dict_list[0]['ParticleIDs']
         else:
-            if file_parts == 1:
-                arr = gas_data_dict_list[0][key]
-            else:
-                arr = np.concatenate((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
-        part0.create_dataset(key, data=arr)
+            pIDs = np.concatenate((collisionless_data_dict_list[0][key], collisionless_data_dict_list[1][key], collisionless_data_dict_list[2][key], collisionless_data_dict_list[3][key]))
+        refine_flag_array = np.zeros(len(pIDs))
+        refine_flag_array = refine_flag_array.astype('int32')
+        part2.create_dataset("RefinementFlag", data=refine_flag_array)
+
     
-
-    print ("Writing PartType1 to file...")
-    part1 = f.create_group('PartType1')
-    for key in dm_data_dict_list[0].keys():
-        if dm_data_dict_list[0][key].ndim>1:
+        print("Writing PartType4 to file...")
+        part4 = f.create_group('PartType4')
+        # Check if there are any star particles
+        if any(len(d) > 0 for d in star_data_dict_list):
+            # Process star data if it exists
+            for key in star_data_dict_list[0].keys():
+                if star_data_dict_list[0][key].ndim > 1:
+                    if file_parts == 1:
+                        arr = star_data_dict_list[0][key]
+                    else:
+                        arr = np.vstack((star_data_dict_list[0][key], star_data_dict_list[1][key], star_data_dict_list[2][key], star_data_dict_list[3][key]))
+                else:
+                    if file_parts == 1:
+                        arr = star_data_dict_list[0][key]
+                    else:
+                        arr = np.concatenate((star_data_dict_list[0][key], star_data_dict_list[1][key], star_data_dict_list[2][key], star_data_dict_list[3][key]))
+                part4.create_dataset(key, data=arr)
+            
+            # Create refinement flags
             if file_parts == 1:
-                arr = dm_data_dict_list[0][key]
+                pIDs = star_data_dict_list[0]['ParticleIDs']
             else:
-                arr = np.vstack((dm_data_dict_list[0][key], dm_data_dict_list[1][key], dm_data_dict_list[2][key], dm_data_dict_list[3][key]))
+                pIDs = np.concatenate((star_data_dict_list[0]['ParticleIDs'], star_data_dict_list[1]['ParticleIDs'], star_data_dict_list[2]['ParticleIDs'], star_data_dict_list[3]['ParticleIDs']))
+            refine_flag_array = np.zeros(len(pIDs), dtype='int32')
+            part4.create_dataset("RefinementFlag", data=refine_flag_array)
         else:
-            if file_parts == 1:
-                arr = dm_data_dict_list[0][key]
-            else:
-                arr = np.concatenate((dm_data_dict_list[0][key], dm_data_dict_list[1][key], dm_data_dict_list[2][key], dm_data_dict_list[3][key]))
-        part1.create_dataset(key, data=arr)
-    if file_parts == 1:
-        pIDs = dm_data_dict_list[0]['ParticleIDs']
-    else:
-        pIDs = np.concatenate((dm_data_dict_list[0][key], dm_data_dict_list[1][key], dm_data_dict_list[2][key], dm_data_dict_list[3][key]))
-    refine_flag_array = np.zeros(len(pIDs))
-    refine_flag_array = refine_flag_array.astype('int32')
-    part1.create_dataset("RefinementFlag", data=refine_flag_array)
+            # Create empty datasets if no star particles exist
+            # Example empty dataset creation (adjust types/dimensions as needed)
+            part4.create_dataset("ParticleIDs", data=np.array([], dtype=np.uint64))
+            part4.create_dataset("RefinementFlag", data=np.array([], dtype='int32'))
 
-    
-    print ("Writing PartType2 to file...")
-    part2 = f.create_group('PartType2')
-    for key in collisionless_data_dict_list[0].keys():
-        if collisionless_data_dict_list[0][key].ndim>1:
-            if file_parts == 1:
-                arr = collisionless_data_dict_list[0][key]
-            else:
-                arr = np.vstack((collisionless_data_dict_list[0][key], collisionless_data_dict_list[1][key], collisionless_data_dict_list[2][key], collisionless_data_dict_list[3][key]))
-        else:
-            if file_parts == 1:
-                arr = collisionless_data_dict_list[0][key]
-            else:
-                arr = np.concatenate((collisionless_data_dict_list[0][key], collisionless_data_dict_list[1][key], collisionless_data_dict_list[2][key], collisionless_data_dict_list[3][key]))
-        part2.create_dataset(key, data=arr)
-    if file_parts == 1:
-        pIDs = collisionless_data_dict_list[0]['ParticleIDs']
-    else:
-        pIDs = np.concatenate((collisionless_data_dict_list[0][key], collisionless_data_dict_list[1][key], collisionless_data_dict_list[2][key], collisionless_data_dict_list[3][key]))
-    refine_flag_array = np.zeros(len(pIDs))
-    refine_flag_array = refine_flag_array.astype('int32')
-    part2.create_dataset("RefinementFlag", data=refine_flag_array)
-
-    
+    """
     print ("Writing PartType4 to file...")
     part4 = f.create_group('PartType4')
     for key in star_data_dict_list[0].keys():
@@ -248,6 +295,7 @@ def create_hdf5_file_flag_based_refinement(snap_num, params, ic_path, ic_file_na
     refine_flag_array = np.zeros(len(pIDs))
     refine_flag_array = refine_flag_array.astype('int32')
     part4.create_dataset("RefinementFlag", data=refine_flag_array)
+    """
 
 
 
@@ -258,8 +306,14 @@ def create_hdf5_file_flag_based_refinement(snap_num, params, ic_path, ic_file_na
     # The refinement flag array is a 1D array with the same length as the number of gas particles, 1 for particles to be used in the COM calculation and 0 otherwise
     #_, _, pID_array_for_tagging = load_pIDs_to_tag_from_file(params, snap_num, refine_pos_snap, final_refine_coords, dist_cut_off, follow_particle_types, units_to_physical=False)
 
-    print ("Loading pIDs to tag from file...")
-    pID_array_for_tagging = load_pIDs_to_tag_from_file(params, load_file_path=load_file_path, load_file_name=load_file_name)
+    if full_load_file_path is None:
+        print ("Loading pIDs to tag from file...")
+        pID_array_for_tagging = load_pIDs_to_tag_from_file(params, load_file_path=load_file_path, load_file_name=load_file_name)
+    else:
+        print ("Loading pIDs to tag from file by full path...")
+        pID_array_for_tagging = load_pIDs_to_tag_from_file_by_full_path(full_load_file_path)
+    print(f"Shape of pID_array_for_tagging: {np.shape(pID_array_for_tagging)}")
+    print(f"pID_array_for_tagging: {pID_array_for_tagging}")
     
 
 
@@ -282,6 +336,8 @@ def create_hdf5_file_flag_based_refinement(snap_num, params, ic_path, ic_file_na
         pID_child_nums = np.concatenate((gas_data_dict_list[0][key], gas_data_dict_list[1][key], gas_data_dict_list[2][key], gas_data_dict_list[3][key]))
     
     pID_array = np.column_stack((pIDs, pID_gen_nums, pID_child_nums))
+    print(f"Shape of pID_array: {np.shape(pID_array)}")
+    print(f"pID_array: {pID_array}")
     
 
 
@@ -289,10 +345,17 @@ def create_hdf5_file_flag_based_refinement(snap_num, params, ic_path, ic_file_na
 
     # Now check where pID_array_for_tagging matches the pID array fully and set those indices to 1
     refinement_flag_array = np.zeros(len(pIDs))
-    inds = np.where((pID_array==pID_array_for_tagging[:,None]).all(-1))[1]
+    # Vasilii EDIT BEGIN
+    # Compare only the first column of pID_array with the tagging array
+    inds = np.where(np.isin(pID_array[:, 0], pID_array_for_tagging))[0]
+    #inds = np.where((pID_array==pID_array_for_tagging[:,None]).all(-1))[1] # Original
+    # Vasilii EDIT END
     refinement_flag_array[inds]=1
     #refinement_flag_array = refinement_flag_array.astype('uint32')
     refinement_flag_array = refinement_flag_array.astype('int32')
+    if nowrite:
+        print("The code reached the point of writing successfully. Disable debugging by setting nowrite to False")
+        exit(0)
     part0.create_dataset("RefinementFlag", data=refinement_flag_array)
     
     key = "Coordinates"
@@ -343,21 +406,22 @@ if __name__ == '__main__':
     ic_path = args['--ic_path']
     ic_file_name = args['--ic_file_name']
     load_file_path = args['--load_file_path']
+    full_load_file_path = args['--full_load_file_path']
     load_file_name = args['--load_file_name']
     #flag_based_refinement = convert_to_bool(args['--flag_based_refinement'])
     snapdir = convert_to_bool(args['--snapdir'])
     file_parts = int(args['--file_parts'])
 
     ## Some bookkeeping
-    path = "/mnt/raid-project/murray/khullar/FIRE-3/"
-    start_snap = 500
-    last_snap = 900
+    #path = "/mnt/raid-project/murray/khullar/FIRE-3/"
+    start_snap = 0
+    last_snap = 20
     linked_filename_prefix = "Linked_Clouds_"
     cloud_num_digits = 4
     snapshot_num_digits = 4
     cloud_prefix = "Cloud"
     hdf5_file_prefix = 'Clouds_'
-    sim = 'm12f_m7e3_MHD_fire3_fireBH_Sep182021_hr_crdiffc690_sdp1e10_gacc31_fa0.5'
+    #sim = 'm12f_m7e3_MHD_fire3_fireBH_Sep182021_hr_crdiffc690_sdp1e10_gacc31_fa0.5'
     age_cut = 5
     dat_file_header_size = 11
     snapshot_prefix = "Snap"
@@ -374,6 +438,9 @@ if __name__ == '__main__':
     sub_dir = f"CloudPhinderData/n{nmin}_alpha{vir}/"
     vels_sub_dir = 'vel_sub/'
     gal_quants_sub_dir = 'gal_quants/'
+    print(f"load_file_name: {load_file_name}")
+    print(f"load_file_path: {load_file_path}")
+    print(f"path: {path}")
 
     params = Params(path=path, sub_dir=sub_dir, start_snap=start_snap, last_snap=last_snap,
                     filename_prefix=linked_filename_prefix, cloud_prefix=cloud_prefix,
@@ -387,11 +454,12 @@ if __name__ == '__main__':
                             f"_alpha{params.vir}_{params.frac_thresh}_{params.start_snap}_{params.last_snap}_names.txt"
 
     print ("Path = ", params.path)
+    print(f"Snapdir: {snapdir}")
 
     #print ("Flag Based Refinement mode...")
     #get_pIDs_to_tag(params, file_snap_num, refine_pos_snap, final_refine_coords, dist_cut_off, follow_particle_types, units_to_physical=False)
     
-    create_hdf5_file_flag_based_refinement(snap_num, params, ic_path, ic_file_name, load_file_path, load_file_name, file_parts=file_parts, snapdir_flag=snapdir)
+    create_hdf5_file_flag_based_refinement(snap_num, params, ic_path, ic_file_name, load_file_path, load_file_name, file_parts=file_parts, snapdir_flag=snapdir, full_load_file_path=full_load_file_path)
 
 
     print("HDF5 file created successfully")
