@@ -17,6 +17,8 @@ h5py
 packaging
 pyparsing
 cycler
+colorcet
+numba
 ```
 
 

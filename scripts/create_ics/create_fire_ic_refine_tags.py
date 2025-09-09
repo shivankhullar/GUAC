@@ -453,8 +453,8 @@ if __name__ == '__main__':
     params.linked_filename = f"{params.path}{params.sub_dir}{params.filename_prefix}n{params.nmin}"+\
                             f"_alpha{params.vir}_{params.frac_thresh}_{params.start_snap}_{params.last_snap}_names.txt"
 
-    print ("Path = ", params.path)
-    print(f"Snapdir: {snapdir}")
+    #print ("Path = ", params.path)
+    #print(f"Snapdir: {snapdir}")
 
     #print ("Flag Based Refinement mode...")
     #get_pIDs_to_tag(params, file_snap_num, refine_pos_snap, final_refine_coords, dist_cut_off, follow_particle_types, units_to_physical=False)
@@ -462,7 +462,7 @@ if __name__ == '__main__':
     create_hdf5_file_flag_based_refinement(snap_num, params, ic_path, ic_file_name, load_file_path, load_file_name, file_parts=file_parts, snapdir_flag=snapdir, full_load_file_path=full_load_file_path)
 
 
-    print("HDF5 file created successfully")
+    print(f"HDF5 file created successfully with path {ic_path}{ic_file_name}")
 
 
 

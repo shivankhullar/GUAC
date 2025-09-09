@@ -219,7 +219,7 @@ for i in range(start_snap, last_snap+1):
         redshift = f["Header"].attrs["Redshift"]
         print(f"Redshift: {redshift}")
         if "PartType4" in f.keys():
-            print("Stars found in snapshot {snap_num}")
+            print(f"Stars found in snapshot {snap_num}")
             break
         elif i == last_snap:
             raise ValueError("No stars found forming")
@@ -258,10 +258,15 @@ with h5py.File(path_to_snap, "r") as f:
     max_age_idx = np.argmax(star_ages)
     custom_pos = get_first_star_pos(coords, star_coords, max_age_idx, sphere_r)
     first_star_id = -1
-    if custom_pos == 0:
-        first_star_id = star_part_ids[max_age_idx]
-        print(f"No gas particles were found within {sphere_r} of the first star.")
-        print(f"Obtaining coordinates from the previous snapshot...")
+    print(f"Custom position: {custom_pos}")
+    if type(custom_pos) is int:
+        if not custom_pos:
+            first_star_id = star_part_ids[max_age_idx]
+            print(f"No gas particles were found within {sphere_r} of the first star.")
+            print(f"Obtaining coordinates from the previous snapshot...")
+        else:
+            print("Something is wrong. custom_pos is non-zero integer. Exiting...")
+            exit(1)
     else:
         tracked_IDs = get_tracked_parts_ids(coords, custom_pos, part_ids, sphere_r)
 
