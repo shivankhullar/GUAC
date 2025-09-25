@@ -117,7 +117,7 @@ def plot_surf_dens(image_box_size, pdata, snap_num, com, gas_dists, save_path, f
     if fire_units:
         sigma_gas_msun_pc2 = M.SurfaceDensity(M.m*1e10,center=center,\
                                             size=image_box_size,res=res)/1e6 #*1e4
-        p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=1e-2,vmax=5e4), cmap='inferno')
+        p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=1e-2,vmax=5e2), cmap='inferno')
         ax.scatter(com[0], com[1], c='g', s=10)
     
     else:
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     sim = args['--sim']
     num_cores = int(args['--num_cores'])
     snapdir = convert_to_bool(args['--snapdir'])
-    save_path = path+sim+'/'+args['--save_path']
+    save_path = './'+args['--save_path']
     image_box_size = float(args['--image_box_size'])
     refinement_tag = convert_to_bool(args['--refinement_flag'])
     snapnum_range = convert_to_array(args['--snapnum_range'], dtype=np.int32)
