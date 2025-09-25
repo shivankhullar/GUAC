@@ -17,6 +17,68 @@ import glob
 import os
 
 
+def find_first_star_in_snapshot(snap_file, ptype):
+    """
+    Find the first star (earliest formation time) in a specific snapshot for given particle type.
+    
+    Args:
+        snap_file (str): Path to snapshot file
+        ptype (str): Particle type ('PartType4' or 'PartType5')
+        
+    Returns:
+        dict: Information about the first star or None if not found
+    """
+    try:
+        with h5py.File(snap_file, 'r') as f:
+            if ptype not in f:
+                return None
+                
+            # Check if StellarFormationTime exists
+            if 'StellarFormationTime' not in f[ptype]:
+                return None
+                
+            formation_times = f[ptype]['StellarFormationTime'][:]
+            
+            # Only consider particles that have actually formed (formation time > 0)
+            valid_indices = formation_times > 0
+            if not np.any(valid_indices):
+                return None
+                
+            valid_formation_times = formation_times[valid_indices]
+            
+            # Find the earliest formation time
+            earliest_idx_in_valid = np.argmin(valid_formation_times)
+            # Map back to original array index
+            original_indices = np.where(valid_indices)[0]
+            earliest_idx = original_indices[earliest_idx_in_valid]
+            
+            earliest_formation_time = formation_times[earliest_idx]
+            
+            # Get mass if available
+            mass = None
+            if 'Masses' in f[ptype]:
+                mass = f[ptype]['Masses'][earliest_idx]
+            elif 'Mass' in f[ptype]:
+                mass = f[ptype]['Mass'][earliest_idx]
+            
+            # Get coordinates if available
+            coordinates = None
+            if 'Coordinates' in f[ptype]:
+                coordinates = f[ptype]['Coordinates'][earliest_idx]
+                
+            return {
+                'particle_index': earliest_idx,
+                'formation_time': earliest_formation_time,
+                'mass': mass,
+                'coordinates': coordinates,
+                'total_valid_stars': np.sum(valid_indices)
+            }
+            
+    except Exception as e:
+        print(f"Error analyzing {snap_file}: {e}")
+        return None
+
+
 def find_first_star_snapshot(snapdir, verbose=False):
     """
     Find the first snapshot containing star particles (PartType4 or PartType5).
@@ -123,6 +185,19 @@ def find_first_star_snapshot(snapdir, verbose=False):
                 print(f"  Error reading {snap_file}: {e}")
             continue
     
+    # Now analyze the first stars in each snapshot we found
+    if results['PartType4'] is not None:
+        if verbose:
+            print(f"Analyzing first star in PartType4 snapshot...")
+        first_star4 = find_first_star_in_snapshot(results['PartType4']['file'], 'PartType4')
+        results['PartType4']['first_star'] = first_star4
+        
+    if results['PartType5'] is not None:
+        if verbose:
+            print(f"Analyzing first star in PartType5 snapshot...")
+        first_star5 = find_first_star_in_snapshot(results['PartType5']['file'], 'PartType5')
+        results['PartType5']['first_star'] = first_star5
+    
     return results
 
 
@@ -146,6 +221,20 @@ def print_results(results):
             print(f"  Scale factor: {p4['scale_factor']:.6f}")
         if p4['redshift'] is not None:
             print(f"  Redshift: {p4['redshift']:.3f}")
+        
+        # Print first star details
+        if 'first_star' in p4 and p4['first_star'] is not None:
+            star = p4['first_star']
+            print(f"  First star details:")
+            print(f"    Formation time: {star['formation_time']:.6f}")
+            if star['mass'] is not None:
+                print(f"    Mass: {star['mass']:.6e}")
+            print(f"    Particle index: {star['particle_index']}")
+            if star['coordinates'] is not None:
+                print(f"    Coordinates: [{star['coordinates'][0]:.3f}, {star['coordinates'][1]:.3f}, {star['coordinates'][2]:.3f}]")
+            print(f"    Total stars with valid formation times: {star['total_valid_stars']}")
+        else:
+            print(f"  No stars with valid formation times found")
     else:
         print(f"\nPartType4: No particles found in any snapshot")
     
@@ -159,6 +248,20 @@ def print_results(results):
             print(f"  Scale factor: {p5['scale_factor']:.6f}")
         if p5['redshift'] is not None:
             print(f"  Redshift: {p5['redshift']:.3f}")
+        
+        # Print first star details
+        if 'first_star' in p5 and p5['first_star'] is not None:
+            star = p5['first_star']
+            print(f"  First star details:")
+            print(f"    Formation time: {star['formation_time']:.6f}")
+            if star['mass'] is not None:
+                print(f"    Mass: {star['mass']:.6e}")
+            print(f"    Particle index: {star['particle_index']}")
+            if star['coordinates'] is not None:
+                print(f"    Coordinates: [{star['coordinates'][0]:.3f}, {star['coordinates'][1]:.3f}, {star['coordinates'][2]:.3f}]")
+            print(f"    Total stars with valid formation times: {star['total_valid_stars']}")
+        else:
+            print(f"  No stars with valid formation times found")
     else:
         print(f"\nPartType5: No particles found in any snapshot")
     
