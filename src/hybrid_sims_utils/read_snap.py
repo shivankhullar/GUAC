@@ -10,7 +10,7 @@ import h5py
 
 
 
-def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, refinement_tag=False, verbose=True):
+def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, refinement_tag=False, verbose=True, full_tag=False):
 
     if snap<10:
         snapname = 'snapshot_'+snapshot_suffix+'00{num}'.format(num=snap) 
@@ -29,7 +29,10 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
     
     F = h5py.File(filename,"r")
     pdata = {}
-    if refinement_tag:
+    if full_tag:
+        for field in F['PartType0'].keys():
+            pdata[field] = F["PartType0"][field][:]
+    elif refinement_tag:
         for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber", "RefinementFlag": #, "MagneticField", "Potential":
             pdata[field] = F["PartType0"][field][:]#[density_cut]
     else:
