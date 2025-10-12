@@ -24,25 +24,26 @@ Options:
         
     --density_exponent=<f>   Power law exponent of the density profile [default: 0.0]
     
-    --bturb=<f>          Magnetic energy as a fraction of the binding energy [default: 0.1]
+    --bturb=<f>          Magnetic energy as a fraction of the binding energy [default: 0.0]
     --bfixed=<f>         Magnetic field in magnitude in code units, used instead of bturb if not set to zero [default: 0]
     
     --boxsize=<f>        Simulation box size
     --derefinement       Apply radial derefinement to ambient cells outside of 3* cloud radius
-    --no_diffuse_gas     Remove diffuse ISM envelope fills the rest of the box with uniform density. 
+    
     
     --B_unit=<gauss>     Unit of magnetic field in gauss [default: 1e4]
     --length_unit=<pc>   Unit of length in pc [default: 1]
     --mass_unit=<msun>   Unit of mass in M_sun [default: 1]
     --v_unit=<m/s>       Unit of velocity in m/s [default: 1]
     
-    --tmax=<N>           Maximum time to run the simulation to, in units of the freefall time [default: 5]
-    --nsnap=<N>          Number of snapshots per freefall time [default: 150]
+    --tmax=<N>           Maximum time to run the simulation to, in units of the freefall time [default: 3]
+    --nsnap=<N>          Number of snapshots per sound crossing time [default: 250]
     --param_only         Just makes the parameters file, not the IC
     
     --makebox            Creates a second box IC of equivalent volume and mass to the cloud
 """
 # Example:  python MakeCloud.py --M=1000 --N=1e7 --R=1.0 --localdir --param_only
+#--no_diffuse_gas     Remove diffuse ISM envelope fills the rest of the box with uniform density. 
 
 import os
 import numpy as np
@@ -91,7 +92,7 @@ magnetic_field = float(arguments["--bturb"])
 bfixed = float(arguments["--bfixed"])
 
 filename = arguments["--file_name"]
-diffuse_gas = not arguments["--no_diffuse_gas"]
+diffuse_gas = True #not arguments["--no_diffuse_gas"]
 
 param_only = arguments["--param_only"]
 
@@ -139,7 +140,8 @@ if delta_m_solar < 0.1:  # if we're doing something marginally IMF-resolving
         3.11e-5  # ~6.5 AU, minimum sink radius is 2.8 times that (~18 AU)
     )
 else:  # something more FIRE-like, where we rely on a sub-grid prescription turning gas into star particles
-    softening = 0.1
+    softening = 3.11e-5 # for glass let's use the same values to be consistent
+    #softening = 0.1
 
 
 tff = (3 * np.pi / (32 * G * rho_avg)) ** 0.5
@@ -147,17 +149,23 @@ L = (4 * np.pi * R**3 / 3) ** (1.0 / 3)  # volume-equivalent box size
 vrms = float(arguments["--vel"])
 #(6 / 5 * G * M_gas / R) ** 0.5 * turbulence**0.5
 
+c_s = np.sqrt((float(arguments["--T"]) * 1.380649e-16 / (2.3 * 1.6726219e-24))) / 1e2               #1e2 to convert to m/s
+pc = 3.086e18
+#t_cs = 2*R * pc / (c_s * 100)  / (pc / 100)                             # converted to code units of ~ 0.977 Gyr
+t_cs = 2*R/c_s
+print ("Sound crossing time:", t_cs, c_s)
+
 file_params = arguments["--file_params"]
 paramsfile = str(open(file_params, "r").read())
 
 
 replacements = {
     "NAME": filename.replace(".hdf5", ""),
-    "DTSNAP": tff / nsnap,
-    "MAXTIMESTEP": tff / (nsnap),
+    "DTSNAP": t_cs / nsnap,
+    "MAXTIMESTEP": t_cs / (nsnap) / 2,
     "SOFTENING": softening,
     "GASSOFT": 2.0e-8,
-    "TMAX": tff * tmax,
+    "TMAX": t_cs * tmax,
     "BOXSIZE": boxsize,
     "OUTFOLDER": "output",
     "BH_SEED_MASS": delta_m / 2.0,
@@ -261,12 +269,17 @@ x = x - np.average(x, axis=0)
 
 
 
-u = np.ones_like(mgas) * 0.101 / 2.0  # /2 needed because it is molecular
+#u = np.ones_like(mgas) * 0.101 / 2.0  # /2 needed because it is molecular
 
-u = (
-    np.ones_like(mgas) * (200 / v_unit) ** 2
-)  # start with specific internal energy of (200m/s)^2, this is overwritten unless starting with restart flag 2###### #0.101/2.0 #/2 needed because it is molecular
+#u = (
+#    np.ones_like(mgas) * (200 / v_unit) ** 2
+#)  # start with specific internal energy of (200m/s)^2, this is overwritten unless starting with restart flag 2###### #0.101/2.0 #/2 needed because it is molecular
 
+
+u = np.ones_like(mgas) * c_s**2
+print ("Internal energy cold gas:", u, dm, c_s)
+#(float(arguments["--T"]) * 1.380649e-16 / (2.3 * 1.6726219e-24))  / 1e4  # 1e4 to convert to Msun m^2/s^2 
+#/ v_unit**2  # temperature in K, mean molecular weight 2.3
 
 
 
@@ -316,8 +329,10 @@ if diffuse_gas:
     B = np.concatenate(
         [B, np.repeat(Bmag, N_warm)[:, np.newaxis] * np.array([0, 0, 1])]
     )
-    u = np.concatenate([u, np.repeat(101.0, N_warm)])
-
+    #u = np.concatenate([u, np.repeat(101.0, N_warm)])
+    warm_u = c_s**2 * 1000  # 1000 for pressure equilibrium corresponding to the density contrast of 1000 
+    u = np.concatenate([u, np.repeat(warm_u, N_warm)])
+    print ("Internal energy total:", u, warm_u, dm, c_s)
     
 else:
     N_warm = 0
