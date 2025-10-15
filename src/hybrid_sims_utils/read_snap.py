@@ -6,6 +6,7 @@ Date: Feb 2025
 
 """
 import h5py
+import numpy as np
 #from galaxy_utils.gal_utils import *
 
 
