@@ -105,9 +105,9 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
             star_coords = star_data['Coordinates']
             star_masses = star_data['Masses']
             # Scale marker size by mass
-            marker_size = 100 * (star_masses / np.max(star_masses))
+            marker_size = 20 * (star_masses / np.max(star_masses))
             ax.scatter(star_coords[:, 0], star_coords[:, 1], 
-                      c='cyan', s=marker_size, alpha=0.8, edgecolors='white', linewidths=0.5)
+                      c='white', s=marker_size, alpha=0.8, edgecolors='white', linewidths=0.5)
         
         if fire_star_data is not None and 'Coordinates' in fire_star_data and len(fire_star_data['Coordinates']) > 0:
             fire_star_coords = fire_star_data['Coordinates']
@@ -126,9 +126,9 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
         
         # Add scalebar
         fontprops = fm.FontProperties(size=18)
-        scale_bar_size = int(image_box_size / 4)
+        scale_bar_size = float(image_box_size / 4)
         scalebar = AnchoredSizeBar(ax.transData,
-                                    scale_bar_size, f'{scale_bar_size} pc', 'upper left',
+                                    scale_bar_size, '%.1f pc'%(scale_bar_size), 'upper left',
                                     pad=1,
                                     color='white',
                                     frameon=False,
