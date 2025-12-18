@@ -80,7 +80,7 @@ def get_scale_factors(co, start_a, end_a, spacing_in_Myr, cut_off_time=24, key='
         iteration=0
         while current_time<=end_time:
             if len(spacing_in_Myr)>1:
-                if current_time <= start_time + cut_off_time*Myr:
+                if (current_time - start_time) <= cut_off_time*Myr:
                     current_spacing_in_Myr = spacing_in_Myr[0]
                 else:
                     current_spacing_in_Myr = spacing_in_Myr[1]

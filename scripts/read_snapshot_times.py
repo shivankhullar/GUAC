@@ -18,7 +18,7 @@ from yt.units import parsec, Msun
 import numpy as np
 from docopt import docopt
 import glob
-
+from generic_utils.constants import *
 
 def print_scale_factors(snapdir, read_co=True, anyhdf5=False):
     """
@@ -48,7 +48,7 @@ def print_scale_factors(snapdir, read_co=True, anyhdf5=False):
             redshift = f['Header'].attrs['Redshift']
         except:
             redshift = 1.0/a - 1.0
-        Myr = 3.15576e13
+        #Myr = 3.15576e13
         if read_co:
             try:
                 omega_matter = f['Header'].attrs['Omega0']
