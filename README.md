@@ -12,6 +12,13 @@ docopt
 pfh_python
 meshoid
 glob
+yt
+h5py
+packaging
+pyparsing
+cycler
+colorcet
+numba
 ```
 
 
