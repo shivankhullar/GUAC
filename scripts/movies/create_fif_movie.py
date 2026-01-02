@@ -5,9 +5,11 @@ from cloud_utils.cloud_quants import *
 from cloud_utils.cloud_utils import *
 from cloud_utils.cloud_selection import *
 from hybrid_sims_utils.read_snap import *
+from constants import *
 
 from meshoid import Meshoid
 import matplotlib
+matplotlib.use('Agg')  # Set non-interactive backend for parallel processing
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib import colors
@@ -23,6 +25,8 @@ import os
 from tqdm import tqdm
 import pickle
 import itertools
+from multiprocessing import Pool
+import functools
 
 
 def get_rotation_matrix(axis='x', angle_deg=90):
@@ -191,23 +195,30 @@ def get_scale_bar_size(image_box_size):
 
 
 
-def plot_image(com, new_coords, new_star_coords, pdata, stardata, image_box_size, res=1024, fire_units=True, aspect="rectangle", cmap='cividis'):
+def plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axis, angle_deg, res=1024, fire_units=True, aspect="rectangle", cmap='cividis', save_path='./'):
     #fire_units = True
     #res = 800
     fig, ax = plt.subplots()
     if aspect=="rectangle":
         fig.set_size_inches(16, 9)
-        res = 1920
+        #res = 1920
     else:
         fig.set_size_inches(8,8)
 
     center = com
     dist_cut_off = image_box_size*2
 
-    pos, mass, hsml = new_coords[gas_dists<dist_cut_off], pdata["Masses"][gas_dists<dist_cut_off], \
+
+    pos, mass, hsml = pdata["Coordinates"][gas_dists<dist_cut_off], pdata["Masses"][gas_dists<dist_cut_off], \
                                 pdata["SmoothingLength"][gas_dists<dist_cut_off]
 
-    M = Meshoid(pos, mass, hsml)
+    #new_coords = rotate_coordinates(pdata["Coordinates"], axis='z', angle_deg=0, center=com)
+    #new_star_coords = rotate_coordinates(stardata["Coordinates"], axis='z', angle_deg=0, center=com)
+
+    new_coords = rotate_coordinates(pos, axis=axis, angle_deg=angle_deg, center=com)
+    new_star_coords = rotate_coordinates(stardata["Coordinates"], axis=axis, angle_deg=angle_deg, center=com)
+
+    M = Meshoid(new_coords, mass, hsml)
 
     min_pos = center-image_box_size/2
     max_pos = center+image_box_size/2
@@ -221,7 +232,8 @@ def plot_image(com, new_coords, new_star_coords, pdata, stardata, image_box_size
         sigma_gas_msun_pc2 = M.SurfaceDensity(M.m*1e10,center=center,\
                                             size=image_box_size,res=res)/1e6 #*1e4
         if aspect == "rectangle":
-            p = ax.pcolormesh(X[:, int(3.5*120):int(12.5*120)], Y[:, int(3.5*120):int(12.5*120)], sigma_gas_msun_pc2[:, int(3.5*120):int(12.5*120)], norm=colors.LogNorm(vmin=sigma_gas_msun_pc2.min(),vmax=sigma_gas_msun_pc2.max()), cmap=cmap)
+            pixel_multiplier = int(res/16)
+            p = ax.pcolormesh(X[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], Y[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], sigma_gas_msun_pc2[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], norm=colors.LogNorm(vmin=sigma_gas_msun_pc2.min(),vmax=sigma_gas_msun_pc2.max()), cmap=cmap)
         else:
             p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=sigma_gas_msun_pc2.min(),vmax=sigma_gas_msun_pc2.max()), cmap=cmap)      
 
@@ -250,12 +262,7 @@ def plot_image(com, new_coords, new_star_coords, pdata, stardata, image_box_size
 
 
 
-    scale_bar_size, scale_bar_unit = get_scale_bar_size(image_box_size)
-
-    if scale_bar_size < 1:
-        scale_bar_text = f"{scale_bar_size:.1f}"+scale_bar_unit
-    else:
-        scale_bar_text = f"{scale_bar_size}"+scale_bar_unit
+    scale_bar_size, scale_bar_text = get_scale_bar_size(image_box_size)
 
     fontprops = fm.FontProperties(size=18)
     scalebar = AnchoredSizeBar(ax.transData,
@@ -278,18 +285,20 @@ def plot_image(com, new_coords, new_star_coords, pdata, stardata, image_box_size
     ax.add_artist(scalebar)
 
     plt.tight_layout()
-    #image_save_path = save_path + 'surf_dens/'
-    #if not os.path.exists(image_save_path):
-    #    os.makedirs(image_save_path)
-
+    image_save_path = save_path + 'surf_dens/'
+    if not os.path.exists(image_save_path):
+        os.makedirs(image_save_path)
+    
     #image_box_size_pc = int(image_box_size*1e3)
+    save_file = f"snap_{count:04d}.png"
+    plt.savefig(image_save_path+save_file, dpi=100)#, bbox_inches='tight', pad_inches=0)
+    plt.close(fig)  # Explicitly close the figure
+    print (f"Saved {save_file} to {save_path}....")
 
 
 
 
-
-
-
+save_path = "/mnt/home/skhullar/projects/SFIRE/m12f/jeans_refinement_movie/"
 
 
 path = "/mnt/home/skhullar/ceph/projects/SFIRE/m12f/"
@@ -301,10 +310,12 @@ snapdir=False
 refinement_tag=False
 full_tag=True
 
+print ("Loading data...")
+
 pdata, stardata, fire_stardata, refine_data, snapname = get_snap_data_hybrid(
         sim, path, snap_num, snapshot_suffix=snapshot_suffix, snapdir=snapdir, refinement_tag=refinement_tag, full_tag=full_tag)
 
-
+print ("Loaded data...")
 
 pdata, stardata, fire_stardata = convert_units_to_physical(pdata, stardata, fire_stardata)
 
@@ -318,21 +329,59 @@ gas_dists = np.linalg.norm(gas_pos, axis=1)
 
 
 
-image_box_sizes1 = np.logspace(np.log10(120), np.log10(1e-3), 200)
-image_box_sizes2 = np.logspace(np.log10(1e-3), np.log10(1e-5), 500)
-image_box_sizes = np.append(image_box_sizes1[:-1], image_box_sizes2) 
+
+#image_box_sizes1 = np.logspace(np.log10(120), np.log10(1e-3), 450)
+#image_box_sizes2 = np.logspace(np.log10(1e-3), np.log10(1e-6), 150)
+#image_box_sizes3 = np.logspace(np.log10(1e-6), np.log10(2e-5), 100)
+#image_box_sizes_temp1 = np.append(image_box_sizes1, image_box_sizes2) 
+#image_box_sizes_temp2 = np.repeat(2e-5,200)
+#image_box_sizes = np.append(image_box_sizes_temp1, image_box_sizes_temp2)
+
+image_box_sizes= np.append(np.logspace(np.log10(120), np.log10(1e-3), 450), np.append(np.logspace(np.log10(1e-3), np.log10(1e-6), 150), np.append(np.logspace(np.log10(1e-6), np.log10(2e-5), 100), np.repeat(2e-5,200))))
+axes = ["x"]*400+["z"]*300+["y"]*200
+angle_degs = np.append(np.linspace(0,360,400), np.append(np.repeat(0, 300), np.linspace(0, 90, 200)))
+
+
+#print ("Box sizes: ", image_box_sizes, len(image_box_sizes))
+
+#angle_deg = np.linspace(0,360,200)
+#["x" for i in range(0, len(angle_deg))] + ["y" for i in range(0, len(angle_deg))] + ["y" for i in range(0, len(angle_deg))] + ["x" for i in range(0, len(angle_deg))]
 
 
 
-for image_box_size in image_box_sizes:
-    plot_image(new_coords, new_star_coords, image_box_size)
+#axes3 = ["x" for i in range(0, len(angle_deg))]
+#axes4 = [""]
+#new_coords = rotate_coordinates(pdata["Coordinates"], axis='z', angle_deg=0, center=com)
+#new_star_coords = rotate_coordinates(stardata["Coordinates"], axis='z', angle_deg=0, center=com)
+
+# Parallelization settings
+parallelize = True
+num_cores = 24  # Reduce cores - too many can cause overhead
+
+def plot_wrapper(args):
+    """Wrapper function for parallel processing"""
+    count, image_box_size = args
+    plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920, fire_units=True, aspect="rectangle", cmap='cet_fire', save_path=save_path)
+
+count=0
+if parallelize:
+    print(f"Using {num_cores} cores for parallel processing...")
+    
+    # Create arguments list: (count, image_box_size) pairs
+    args_list = [(i, box_size) for i, box_size in enumerate(image_box_sizes)]
+    
+    # Run in parallel with maxtasksperchild to avoid memory issues
+    with Pool(num_cores, maxtasksperchild=50) as pool:
+        pool.map(plot_wrapper, args_list)
+else:
+    for image_box_size in image_box_sizes:
+        plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920, fire_units=True, aspect="rectangle", cmap='cet_fire', save_path=save_path)
+        count += 1
+
+print ("------------------------------Done!-------------------------------")
 
 
 
 
-
-
-new_coords = rotate_coordinates(pdata["Coordinates"], axis='x', angle_deg=90, center=com)
-new_star_coords = rotate_coordinates(stardata["Coordinates"], axis='x', angle_deg=90, center=com)
 
 
