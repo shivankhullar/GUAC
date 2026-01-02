@@ -96,12 +96,14 @@ def rotate_coordinates(coords, axis='x', angle_deg=90, center=None):
 
 
 
+
 def get_scale_bar_size(image_box_size):
     scale_bar_sizes_kpc = np.array([30, 20, 15, 10, 8, 5, 2, 1])
     compare_box_size_max = scale_bar_sizes_kpc*5
     compare_box_size_min = scale_bar_sizes_kpc*4
 
     try:
+        multiplier = "kpc"
         for i in range(len(scale_bar_sizes_kpc)):
             #print (f"Comparing image box size {image_box_size} to range {compare_box_size_min[i]} to {compare_box_size_max[i]}")
             if image_box_size <= compare_box_size_max[i] and image_box_size >= compare_box_size_min[i]:
@@ -174,11 +176,118 @@ def get_scale_bar_size(image_box_size):
                 #scale_bar_value
 
     if multiplier == "pc":
-        return scale_bar_value * pc / kpc, "pc"
-    if multiplier == "au":
-        return scale_bar_value * AU / kpc, "AU"
-    
-    return scale_bar_value, "kpc"
+        if scale_bar_value < 1:
+            return scale_bar_value * pc / kpc, f"{scale_bar_value:.1f} pc"
+        else:
+            return scale_bar_value * pc / kpc, f"{int(scale_bar_value)} pc"
+    elif multiplier == "au":
+        return scale_bar_value * AU / kpc, f"{int(scale_bar_value)} AU"
+    elif multiplier == "kpc":
+        return scale_bar_value, f"{int(scale_bar_value)} kpc"
+    else:
+        return None
+
+
+
+
+
+def plot_image(com, new_coords, new_star_coords, pdata, stardata, image_box_size, res=1024, fire_units=True, aspect="rectangle", cmap='cividis'):
+    #fire_units = True
+    #res = 800
+    fig, ax = plt.subplots()
+    if aspect=="rectangle":
+        fig.set_size_inches(16, 9)
+        res = 1920
+    else:
+        fig.set_size_inches(8,8)
+
+    center = com
+    dist_cut_off = image_box_size*2
+
+    pos, mass, hsml = new_coords[gas_dists<dist_cut_off], pdata["Masses"][gas_dists<dist_cut_off], \
+                                pdata["SmoothingLength"][gas_dists<dist_cut_off]
+
+    M = Meshoid(pos, mass, hsml)
+
+    min_pos = center-image_box_size/2
+    max_pos = center+image_box_size/2
+    #box_size = max_pos-min_pos
+    X = np.linspace(min_pos[0], max_pos[0], res)
+    Y = np.linspace(min_pos[1], max_pos[1], res)
+
+    X, Y = np.meshgrid(X, Y, indexing='ij')
+
+    if fire_units:
+        sigma_gas_msun_pc2 = M.SurfaceDensity(M.m*1e10,center=center,\
+                                            size=image_box_size,res=res)/1e6 #*1e4
+        if aspect == "rectangle":
+            p = ax.pcolormesh(X[:, int(3.5*120):int(12.5*120)], Y[:, int(3.5*120):int(12.5*120)], sigma_gas_msun_pc2[:, int(3.5*120):int(12.5*120)], norm=colors.LogNorm(vmin=sigma_gas_msun_pc2.min(),vmax=sigma_gas_msun_pc2.max()), cmap=cmap)
+        else:
+            p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=sigma_gas_msun_pc2.min(),vmax=sigma_gas_msun_pc2.max()), cmap=cmap)      
+
+    else:
+        sigma_gas_msun_pc2 = M.SurfaceDensity(M.m,center=center,\
+                                            size=image_box_size,res=res)
+        p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=1,vmax=2e3), cmap='inferno')
+
+
+    if len(stardata.keys()) > 0:
+        ax.scatter(new_star_coords[:,0], new_star_coords[:,1], c='w', s=stardata["ProtoStellarRadius_inSolar"]*Rsun/kpc/image_box_size*10000, alpha=0.5)
+
+    #if len(fire_stardata.keys()) > 0:
+    #    ax.scatter(fire_stardata['Coordinates'][:,0], fire_stardata['Coordinates'][:,1], c='g', s=10, alpha=0.5)
+    if aspect == "rectangle":
+        ax.set_xlim([min_pos[0], max_pos[0]])
+        ax.set_ylim([min_pos[1]+(3.5*image_box_size/16), max_pos[1]-(3.5*image_box_size/16)])
+    else:
+        ax.set_aspect('equal')
+        ax.set_xlim([min_pos[0], max_pos[0]])
+        ax.set_ylim([min_pos[1], max_pos[1]])
+    #plt.colorbar(p, label='Surface Density [M$_\odot$/pc$^2$]')
+    plt.xticks([])
+    plt.yticks([])
+
+
+
+
+    scale_bar_size, scale_bar_unit = get_scale_bar_size(image_box_size)
+
+    if scale_bar_size < 1:
+        scale_bar_text = f"{scale_bar_size:.1f}"+scale_bar_unit
+    else:
+        scale_bar_text = f"{scale_bar_size}"+scale_bar_unit
+
+    fontprops = fm.FontProperties(size=18)
+    scalebar = AnchoredSizeBar(ax.transData,
+                            scale_bar_size, scale_bar_text, 'upper left', 
+                            pad=1,
+                            color='white',
+                            frameon=False,
+                            size_vertical=scale_bar_size/100, 
+                            fontproperties=fontprops)
+
+    #
+    #scalebar = AnchoredSizeBar(ax.transData,
+    #                        image_box_size/4, f'{image_box_size/4:.1f} pc', 'upper left', 
+    #                        pad=1,
+    #                        color='white',
+    #                        frameon=False,
+    #                        size_vertical=image_box_size/100,
+    #                        fontproperties=fontprops)
+
+    ax.add_artist(scalebar)
+
+    plt.tight_layout()
+    #image_save_path = save_path + 'surf_dens/'
+    #if not os.path.exists(image_save_path):
+    #    os.makedirs(image_save_path)
+
+    #image_box_size_pc = int(image_box_size*1e3)
+
+
+
+
+
 
 
 
@@ -208,96 +317,22 @@ gas_pos = pdata['Coordinates'] - com
 gas_dists = np.linalg.norm(gas_pos, axis=1)
 
 
+
+image_box_sizes1 = np.logspace(np.log10(120), np.log10(1e-3), 200)
+image_box_sizes2 = np.logspace(np.log10(1e-3), np.log10(1e-5), 500)
+image_box_sizes = np.append(image_box_sizes1[:-1], image_box_sizes2) 
+
+
+
+for image_box_size in image_box_sizes:
+    plot_image(new_coords, new_star_coords, image_box_size)
+
+
+
+
+
+
 new_coords = rotate_coordinates(pdata["Coordinates"], axis='x', angle_deg=90, center=com)
 new_star_coords = rotate_coordinates(stardata["Coordinates"], axis='x', angle_deg=90, center=com)
 
 
-
-
-fire_units = True
-res = 800
-fig, ax = plt.subplots()
-fig.set_size_inches(16, 9)
-
-center = com #_ref_region #- np.array([0.05,0.05,0.0])
-#center = com - np.array([-0.0001,0.0026,0.0])
-dist_cut_off = image_box_size*2
-
-pos, mass, hsml = new_coords[gas_dists<dist_cut_off], pdata["Masses"][gas_dists<dist_cut_off], \
-                            pdata["SmoothingLength"][gas_dists<dist_cut_off]
-#hsml = np.ones(len(mass))*1
-
-M = Meshoid(pos, mass, hsml)
-
-min_pos = center-image_box_size/2
-max_pos = center+image_box_size/2
-#box_size = max_pos-min_pos
-X = np.linspace(min_pos[0], max_pos[0], res)
-Y = np.linspace(min_pos[1], max_pos[1], res)
-
-X, Y = np.meshgrid(X, Y, indexing='ij')
-
-if fire_units:
-    sigma_gas_msun_pc2 = M.SurfaceDensity(M.m*1e10,center=center,\
-                                        size=image_box_size,res=res)/1e6 #*1e4
-    p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=sigma_gas_msun_pc2.min(),vmax=sigma_gas_msun_pc2.max()), cmap='cividis')
-        
-
-else:
-    sigma_gas_msun_pc2 = M.SurfaceDensity(M.m,center=center,\
-                                        size=image_box_size,res=res)
-    p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=1,vmax=2e3), cmap='inferno')
-
-#ax.scatter(tagged_coords[:,0], tagged_coords[:,1], c='g', s=10, alpha=0.5)
-#ax.scatter(com[0], com[1], c='c', s=10)
-
-if len(stardata.keys()) > 0:
-    #ax.scatter(stardata['Coordinates'][:,0], stardata['Coordinates'][:,1], c='c', s=stardata["BH_Mass"]*1e10*10, alpha=0.5)
-    #ax.scatter(new_star_coords[:,0], new_star_coords[:,1], c='w', s=stardata["BH_Mass"]*1e10*10, alpha=0.5)
-    ax.scatter(stardata['Coordinates'][:,0], stardata['Coordinates'][:,1], c='w', s=stardata["ProtoStellarRadius_inSolar"]*Rsun/kpc/image_box_size*10000, alpha=0.5)
-
-#if len(fire_stardata.keys()) > 0:
-#    ax.scatter(fire_stardata['Coordinates'][:,0], fire_stardata['Coordinates'][:,1], c='g', s=10, alpha=0.5)
-ax.set_aspect('equal')
-ax.set_xlim([min_pos[0], max_pos[0]])
-ax.set_ylim([min_pos[1], max_pos[1]])
-#plt.colorbar(p, label='Surface Density [M$_\odot$/pc$^2$]')
-plt.xticks([])
-plt.yticks([])
-
-
-
-
-scale_bar_size, scale_bar_unit = get_scale_bar_size(image_box_size)
-
-if scale_bar_size < 1:
-    scale_bar_text = f"{scale_bar_size:.1f}"+scale_bar_unit
-else:
-    scale_bar_text = f"{scale_bar_size}"+scale_bar_unit
-
-fontprops = fm.FontProperties(size=18)
-scalebar = AnchoredSizeBar(ax.transData,
-                        scale_bar_size, scale_bar_text, 'upper left', 
-                        pad=1,
-                        color='white',
-                        frameon=False,
-                        size_vertical=scale_bar_size/100, 
-                        fontproperties=fontprops)
-
-#
-#scalebar = AnchoredSizeBar(ax.transData,
-#                        image_box_size/4, f'{image_box_size/4:.1f} pc', 'upper left', 
-#                        pad=1,
-#                        color='white',
-#                        frameon=False,
-#                        size_vertical=image_box_size/100,
-#                        fontproperties=fontprops)
-
-ax.add_artist(scalebar)
-
-plt.tight_layout()
-#image_save_path = save_path + 'surf_dens/'
-#if not os.path.exists(image_save_path):
-#    os.makedirs(image_save_path)
-
-#image_box_size_pc = int(image_box_size*1e3)
