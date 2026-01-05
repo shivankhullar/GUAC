@@ -27,6 +27,7 @@ import pickle
 import itertools
 from multiprocessing import Pool
 import functools
+import time
 
 
 def get_rotation_matrix(axis='x', angle_deg=90):
@@ -244,7 +245,7 @@ def plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axis, ang
 
 
     if len(stardata.keys()) > 0:
-        ax.scatter(new_star_coords[:,0], new_star_coords[:,1], c='w', s=stardata["ProtoStellarRadius_inSolar"]*Rsun/kpc/image_box_size*10000, alpha=0.5)
+        ax.scatter(new_star_coords[:,0], new_star_coords[:,1], c='w', s=stardata["ProtoStellarRadius_inSolar"]*Rsun/kpc/image_box_size*100000, alpha=0.5)
 
     #if len(fire_stardata.keys()) > 0:
     #    ax.scatter(fire_stardata['Coordinates'][:,0], fire_stardata['Coordinates'][:,1], c='g', s=10, alpha=0.5)
@@ -358,25 +359,57 @@ angle_degs = np.append(np.linspace(0,360,400), np.append(np.repeat(0, 300), np.l
 parallelize = True
 num_cores = 24  # Reduce cores - too many can cause overhead
 
+# Global timing variables
+start_time = time.time()
+completed_count = 0
+timing_lock = None
+
 def plot_wrapper(args):
     """Wrapper function for parallel processing"""
+    global completed_count, start_time
     count, image_box_size = args
-    plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920, fire_units=True, aspect="rectangle", cmap='cet_fire', save_path=save_path)
+    plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920, fire_units=True, aspect="rectangle", cmap='cividis', save_path=save_path)
+    
+    # Update progress
+    completed_count += 1
+    if completed_count % 100 == 0:
+        elapsed = time.time() - start_time
+        avg_time = elapsed / completed_count
+        remaining = len(image_box_sizes) - completed_count
+        est_remaining = avg_time * remaining
+        print(f"Progress: {completed_count}/{len(image_box_sizes)} | Elapsed: {elapsed/60:.1f}min | Est. remaining: {est_remaining/60:.1f}min")
 
 count=0
 if parallelize:
     print(f"Using {num_cores} cores for parallel processing...")
+    print(f"Total frames to process: {len(image_box_sizes)}")
     
     # Create arguments list: (count, image_box_size) pairs
     args_list = [(i, box_size) for i, box_size in enumerate(image_box_sizes)]
     
     # Run in parallel with maxtasksperchild to avoid memory issues
+    start_time = time.time()
     with Pool(num_cores, maxtasksperchild=50) as pool:
         pool.map(plot_wrapper, args_list)
+    
+    total_time = time.time() - start_time
+    print(f"Total time: {total_time/60:.1f} minutes ({total_time/3600:.2f} hours)")
 else:
+    print(f"Total frames to process: {len(image_box_sizes)}")
+    start_time = time.time()
     for image_box_size in image_box_sizes:
-        plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920, fire_units=True, aspect="rectangle", cmap='cet_fire', save_path=save_path)
+        plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920, fire_units=True, aspect="rectangle", cmap='cividis', save_path=save_path)
         count += 1
+        
+        if count % 100 == 0:
+            elapsed = time.time() - start_time
+            avg_time = elapsed / count
+            remaining = len(image_box_sizes) - count
+            est_remaining = avg_time * remaining
+            print(f"Progress: {count}/{len(image_box_sizes)} | Elapsed: {elapsed/60:.1f}min | Est. remaining: {est_remaining/60:.1f}min")
+    
+    total_time = time.time() - start_time
+    print(f"Total time: {total_time/60:.1f} minutes ({total_time/3600:.2f} hours)")
 
 print ("------------------------------Done!-------------------------------")
 
