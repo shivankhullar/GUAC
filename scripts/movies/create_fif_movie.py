@@ -232,9 +232,14 @@ def plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axis, ang
     if fire_units:
         sigma_gas_msun_pc2 = M.SurfaceDensity(M.m*1e10,center=center,\
                                             size=image_box_size,res=res)/1e6 #*1e4
+        vmax = sigma_gas_msun_pc2.max()
+        #vmin = sigma_gas_msun_pc2.min()
+        vmin = vmax/1e2
         if aspect == "rectangle":
             pixel_multiplier = int(res/16)
-            p = ax.pcolormesh(X[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], Y[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], sigma_gas_msun_pc2[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], norm=colors.LogNorm(vmin=sigma_gas_msun_pc2.min(),vmax=sigma_gas_msun_pc2.max()), cmap=cmap)
+            #p = ax.pcolormesh(X[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], Y[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], sigma_gas_msun_pc2[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], norm=colors.LogNorm(vmin=sigma_gas_msun_pc2.min(),vmax=sigma_gas_msun_pc2.max()), cmap=cmap)
+
+            p = ax.pcolormesh(X[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], Y[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], sigma_gas_msun_pc2[:, int(3.5*pixel_multiplier):int(12.5*pixel_multiplier)], norm=colors.LogNorm(vmin=vmin,vmax=vmax), cmap=cmap)
         else:
             p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, norm=colors.LogNorm(vmin=sigma_gas_msun_pc2.min(),vmax=sigma_gas_msun_pc2.max()), cmap=cmap)      
 
@@ -284,6 +289,7 @@ def plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axis, ang
     #                        fontproperties=fontprops)
 
     ax.add_artist(scalebar)
+    fig.set_facecolor('black') 
 
     plt.tight_layout()
     image_save_path = save_path + 'surf_dens/'
