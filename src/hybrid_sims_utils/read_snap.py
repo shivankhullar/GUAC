@@ -11,7 +11,7 @@ import numpy as np
 
 
 
-def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, refinement_tag=False, verbose=True, full_tag=False):
+def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, refinement_tag=False, verbose=True, full_tag=False, movie_tag=False):
 
     if snap<10:
         snapname = 'snapshot_'+snapshot_suffix+'00{num}'.format(num=snap) 
@@ -35,6 +35,9 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
             pdata[field] = F["PartType0"][field][:]
     elif refinement_tag:
         for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber", "RefinementFlag": #, "MagneticField", "Potential":
+            pdata[field] = F["PartType0"][field][:]#[density_cut]
+    elif movie_tag:
+        for field in "Masses", "Coordinates", "SmoothingLength", "Velocities", "Temperature": #, "MagneticField", "Potential":
             pdata[field] = F["PartType0"][field][:]#[density_cut]
     else:
         for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber": #, "MagneticField":
