@@ -30,6 +30,7 @@ import itertools
 from multiprocessing import Pool
 import functools
 import time
+from scipy.interpolate import interp1d, UnivariateSpline
 
 
 def get_rotation_matrix(axis='x', angle_deg=90):
@@ -198,7 +199,51 @@ def get_scale_bar_size(image_box_size):
 
 
 
-def plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axis, angle_deg, res=1024, fire_units=True, aspect="rectangle", cmap='cividis', save_path='./'):
+def collect_colorbar_ranges(count, com, pdata, stardata, image_box_size, gas_dists, axis, angle_deg, res=1024):
+    """Collect min/max values for colorbars without saving images."""
+    center = com
+    dist_cut_off = image_box_size*2
+
+    pos, masses, hsml = pdata["Coordinates"][gas_dists<dist_cut_off], pdata["Masses"][gas_dists<dist_cut_off], \
+                                    pdata["SmoothingLength"][gas_dists<dist_cut_off]
+    vx = pdata["Velocities"][:, 0][gas_dists<dist_cut_off]
+    vy = pdata["Velocities"][:, 1][gas_dists<dist_cut_off]
+    vz = pdata["Velocities"][:, 2][gas_dists<dist_cut_off]
+    temps = pdata["Temperature"][gas_dists<dist_cut_off]
+
+    new_coords = rotate_coordinates(pos, axis=axis, angle_deg=angle_deg, center=com)
+
+    sigma_gas = GridSurfaceDensity(masses, new_coords, hsml, com, image_box_size, res=res)
+    temp_gas = GridSurfaceDensity(masses*temps, new_coords, hsml, com, image_box_size, res=res)/sigma_gas
+    sigma_1Dz = GridSurfaceDensity(masses * vz**2, new_coords, hsml, com, image_box_size, res=res)/sigma_gas
+    v_avg = GridSurfaceDensity(masses * vz, new_coords, hsml, com, image_box_size, res=res)/sigma_gas
+    sigma_1D_final = np.sqrt(sigma_1Dz - v_avg**2) / 1e3
+
+    res_16 = res/16
+    cropped_sigma = sigma_gas[:, int(3.5*res_16):int(12.5*res_16)]
+    cropped_sigma_1D = sigma_1D_final[:, int(3.5*res_16):int(12.5*res_16)]
+    cropped_temp = temp_gas[:, int(3.5*res_16):int(12.5*res_16)]
+    
+    # Filter out zeros and invalid values for proper min calculation
+    sigma_valid = cropped_sigma[cropped_sigma > 0]
+    sigma_1D_valid = cropped_sigma_1D[cropped_sigma_1D > 0]
+    temp_valid = cropped_temp[cropped_temp > 0]
+    
+    ranges = {
+        'sigma_gas_min': sigma_valid.min() if len(sigma_valid) > 0 else 1e-10,
+        'sigma_gas_max': sigma_valid.max() if len(sigma_valid) > 0 else 1e10,
+        'sigma_1D_min': sigma_1D_valid.min() if len(sigma_1D_valid) > 0 else 1e-10,
+        'sigma_1D_max': sigma_1D_valid.max() if len(sigma_1D_valid) > 0 else 1e10,
+        'temp_gas_min': temp_valid.min() if len(temp_valid) > 0 else 1e1,
+        'temp_gas_max': temp_valid.max() if len(temp_valid) > 0 else 1e8
+    }
+    
+    print(f"Frame {count:04d}: box_size={image_box_size:.2e} kpc | sigma_gas=[{ranges['sigma_gas_min']:.2e}, {ranges['sigma_gas_max']:.2e}] | sigma_1D=[{ranges['sigma_1D_min']:.2e}, {ranges['sigma_1D_max']:.2e}] | temp=[{ranges['temp_gas_min']:.2e}, {ranges['temp_gas_max']:.2e}]")
+    
+    return ranges
+
+
+def plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axis, angle_deg, res=1024, fire_units=True, aspect="rectangle", cmap='cividis', save_path='./', colorbar_limits=None):
     #fire_units = True
     #res = 800
     fig, ax = plt.subplots()
@@ -208,6 +253,7 @@ def plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axis, ang
     else:
         fig.set_size_inches(8,8)
 
+    res_16 = res/16
     center = com
     dist_cut_off = image_box_size*2    
     #dist_cut_off = image_box_size*4
@@ -252,14 +298,33 @@ def plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axis, ang
     sigma_1D_final = np.sqrt(sigma_1Dz - v_avg**2) / 1e3
 
 
-    res_16 = res/16
-    im = ax.imshow(temp_gas[:, int(3.5*res_16):int(12.5*res_16)].T, origin='lower', norm=LogNorm(vmin=temp_gas.min(), vmax=temp_gas.max()), cmap='cet_fire_r')
-    #im = ax.imshow(sigma_gas.T, origin='lower', norm=LogNorm(vmin=1e-3, vmax=1e-2), cmap='cet_fire', alpha=0.8)
-    #im = ax.imshow(sigma_gas.T, origin='lower', norm=LogNorm(vmin=1e-3, vmax=1), cmap='cet_fire', alpha=0.8)
-    #im = ax.imshow(sigma_gas.T, origin='lower', norm=LogNorm(), cmap='cet_fire', alpha=0.8)
-
-    im = ax.imshow(sigma_gas[:, int(3.5*res_16):int(12.5*res_16)].T, origin='lower', norm=LogNorm(), cmap='cet_fire', alpha=0.8)
-    im = ax.imshow(sigma_1D_final[:, int(3.5*res_16):int(12.5*res_16)].T, origin='lower', norm=LogNorm(), cmap='cividis', alpha=0.5)
+    
+    
+    # Use provided colorbar limits or compute automatically
+    if colorbar_limits is not None:
+        sigma_vmin = colorbar_limits['sigma_gas_min']
+        sigma_vmax = colorbar_limits['sigma_gas_max']
+        sigma_1D_vmin = colorbar_limits['sigma_1D_min']
+        sigma_1D_vmax = colorbar_limits['sigma_1D_max']
+        temp_vmin = colorbar_limits['temp_gas_min']
+        temp_vmax = colorbar_limits['temp_gas_max']
+    else:
+        cropped_sigma = sigma_gas[:, int(3.5*res_16):int(12.5*res_16)]
+        cropped_sigma_1D = sigma_1D_final[:, int(3.5*res_16):int(12.5*res_16)]
+        cropped_temp = temp_gas[:, int(3.5*res_16):int(12.5*res_16)]
+        sigma_valid = cropped_sigma[cropped_sigma > 0]
+        sigma_1D_valid = cropped_sigma_1D[cropped_sigma_1D > 0]
+        temp_valid = cropped_temp[cropped_temp > 0]
+        sigma_vmin = sigma_valid.min() if len(sigma_valid) > 0 else 1e-10
+        sigma_vmax = sigma_valid.max() if len(sigma_valid) > 0 else 1e10
+        sigma_1D_vmin = sigma_1D_valid.min() if len(sigma_1D_valid) > 0 else 1e-10
+        sigma_1D_vmax = sigma_1D_valid.max() if len(sigma_1D_valid) > 0 else 1e10
+        temp_vmin = temp_valid.min() if len(temp_valid) > 0 else 1e1
+        temp_vmax = temp_valid.max() if len(temp_valid) > 0 else 1e8
+    
+    im = ax.imshow(temp_gas[:, int(3.5*res_16):int(12.5*res_16)].T, origin='lower', norm=LogNorm(vmin=temp_vmin, vmax=temp_vmax), cmap='cet_fire_r')
+    im = ax.imshow(sigma_gas[:, int(3.5*res_16):int(12.5*res_16)].T, origin='lower', norm=LogNorm(vmin=sigma_vmin, vmax=sigma_vmax), cmap='cet_fire', alpha=0.8)
+    im = ax.imshow(sigma_1D_final[:, int(3.5*res_16):int(12.5*res_16)].T, origin='lower', norm=LogNorm(vmin=sigma_1D_vmin, vmax=sigma_1D_vmax), cmap='cividis', alpha=0.5)
 
     
 
@@ -295,7 +360,65 @@ def plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axis, ang
     plt.close(fig)  # Explicitly close the figure
     print (f"Saved {save_file} to {save_path}....")
 
+
+def save_colorbar_ranges(ranges_dict, save_path):
+    """Save colorbar ranges to a text file."""
+    ranges_file = os.path.join(save_path, 'colorbar_ranges.txt')
+    with open(ranges_file, 'w') as f:
+        f.write("# Frame sigma_gas_min sigma_gas_max sigma_1D_min sigma_1D_max temp_gas_min temp_gas_max\n")
+        for frame in sorted(ranges_dict.keys()):
+            r = ranges_dict[frame]
+            f.write(f"{frame} {r['sigma_gas_min']:.10e} {r['sigma_gas_max']:.10e} {r['sigma_1D_min']:.10e} {r['sigma_1D_max']:.10e} {r['temp_gas_min']:.10e} {r['temp_gas_max']:.10e}\n")
+    print(f"Saved colorbar ranges to {ranges_file}")
+
+
+def load_and_interpolate_colorbar_ranges(save_path, num_frames):
+    """Load colorbar ranges and interpolate smoothly across all frames."""
+    ranges_file = os.path.join(save_path, 'colorbar_ranges.txt')
     
+    if not os.path.exists(ranges_file):
+        print(f"Error: {ranges_file} not found. Run in 'collect' mode first.")
+        return None
+    
+    # Load data
+    data = np.loadtxt(ranges_file)
+    frames = data[:, 0].astype(int)
+    sigma_gas_min = data[:, 1]
+    sigma_gas_max = data[:, 2]
+    sigma_1D_min = data[:, 3]
+    sigma_1D_max = data[:, 4]
+    temp_gas_min = data[:, 5]
+    temp_gas_max = data[:, 6]
+    
+    # Create smoothing spline functions (use log space for smooth transitions)
+    # Using UnivariateSpline with s (smoothing factor) > 0 for smoothing
+    # s=None means no smoothing (interpolation), s>0 means smoothing
+    smoothing_factor = len(frames) * 0.004  # Adjust this for more/less smoothing
+    interp_sigma_min = UnivariateSpline(frames, np.log10(sigma_gas_min), k=3, s=smoothing_factor)
+    interp_sigma_max = UnivariateSpline(frames, np.log10(sigma_gas_max), k=3, s=smoothing_factor)
+    
+    smoothing_factor = len(frames) * 0.001  # Adjust this for more/less smoothing
+    interp_sigma_1D_min = UnivariateSpline(frames, np.log10(sigma_1D_min), k=3, s=smoothing_factor)
+    interp_sigma_1D_max = UnivariateSpline(frames, np.log10(sigma_1D_max), k=3, s=smoothing_factor)
+    interp_temp_min = UnivariateSpline(frames, np.log10(temp_gas_min), k=3, s=smoothing_factor)
+    interp_temp_max = UnivariateSpline(frames, np.log10(temp_gas_max), k=3, s=smoothing_factor)
+    
+    # Generate interpolated values for all frames
+    all_frames = np.arange(num_frames)
+    interpolated_ranges = {}
+    
+    for frame in all_frames:
+        interpolated_ranges[frame] = {
+            'sigma_gas_min': 10**interp_sigma_min(frame),
+            'sigma_gas_max': 10**interp_sigma_max(frame),
+            'sigma_1D_min': 10**interp_sigma_1D_min(frame),
+            'sigma_1D_max': 10**interp_sigma_1D_max(frame),
+            'temp_gas_min': 10**interp_temp_min(frame),
+            'temp_gas_max': 10**interp_temp_max(frame)
+        }
+    
+    print(f"Loaded and smoothed colorbar ranges for {num_frames} frames using cubic splines")
+    return interpolated_ranges
 
 
 
@@ -357,6 +480,11 @@ angle_degs = np.append(np.linspace(90,360,300), np.append(np.linspace(0,90,100),
 #new_coords = rotate_coordinates(pdata["Coordinates"], axis='z', angle_deg=0, center=com)
 #new_star_coords = rotate_coordinates(stardata["Coordinates"], axis='z', angle_deg=0, center=com)
 
+# Mode settings
+# 'collect': First pass - collect colorbar ranges and save to file
+# 'plot': Second pass - load ranges, interpolate, and create images with smooth colorbars
+MODE = 'plot'  # Change to 'plot' for second pass, 'collect' for first pass
+
 # Parallelization settings
 parallelize = True
 num_cores = 24  # Reduce cores - too many can cause overhead
@@ -365,12 +493,15 @@ num_cores = 24  # Reduce cores - too many can cause overhead
 start_time = time.time()
 completed_count = 0
 timing_lock = None
+colorbar_ranges = {}  # For collecting ranges in 'collect' mode
+interpolated_ranges = None  # For storing interpolated ranges in 'plot' mode
 
-def plot_wrapper(args):
-    """Wrapper function for parallel processing"""
-    global completed_count, start_time
+def collect_wrapper(args):
+    """Wrapper function for collecting colorbar ranges"""
+    global completed_count, start_time, colorbar_ranges
     count, image_box_size = args
-    plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920, fire_units=True, aspect="rectangle", cmap='cividis', save_path=save_path)
+    ranges = collect_colorbar_ranges(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920)
+    colorbar_ranges[count] = ranges
     
     # Update progress
     completed_count += 1
@@ -379,41 +510,122 @@ def plot_wrapper(args):
         avg_time = elapsed / completed_count
         remaining = len(image_box_sizes) - completed_count
         est_remaining = avg_time * remaining
-        print(f"Progress: {completed_count}/{len(image_box_sizes)} | Elapsed: {elapsed/60:.1f}min | Est. remaining: {est_remaining/60:.1f}min")
+        print(f"Collecting Progress: {completed_count}/{len(image_box_sizes)} | Elapsed: {elapsed/60:.1f}min | Est. remaining: {est_remaining/60:.1f}min")
+    
+    return count, ranges
+
+
+def plot_wrapper(args):
+    """Wrapper function for parallel processing with colorbar limits"""
+    global completed_count, start_time, interpolated_ranges
+    count, image_box_size = args
+    colorbar_limits = interpolated_ranges[count] if interpolated_ranges is not None else None
+    plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920, fire_units=True, aspect="rectangle", cmap='cividis', save_path=save_path, colorbar_limits=colorbar_limits)
+    
+    # Update progress
+    completed_count += 1
+    if completed_count % 100 == 0:
+        elapsed = time.time() - start_time
+        avg_time = elapsed / completed_count
+        remaining = len(image_box_sizes) - completed_count
+        est_remaining = avg_time * remaining
+        print(f"Plotting Progress: {completed_count}/{len(image_box_sizes)} | Elapsed: {elapsed/60:.1f}min | Est. remaining: {est_remaining/60:.1f}min")
 
 count=0
-if parallelize:
-    print(f"Using {num_cores} cores for parallel processing...")
-    print(f"Total frames to process: {len(image_box_sizes)}")
-    
-    # Create arguments list: (count, image_box_size) pairs
-    args_list = [(i, box_size) for i, box_size in enumerate(image_box_sizes)]
-    
-    # Run in parallel with maxtasksperchild to avoid memory issues
-    start_time = time.time()
-    with Pool(num_cores, maxtasksperchild=50) as pool:
-        pool.map(plot_wrapper, args_list)
-    
-    total_time = time.time() - start_time
-    print(f"Total time: {total_time/60:.1f} minutes ({total_time/3600:.2f} hours)")
-else:
-    print(f"Total frames to process: {len(image_box_sizes)}")
-    start_time = time.time()
-    for image_box_size in image_box_sizes:
-        plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920, fire_units=True, aspect="rectangle", cmap='cividis', save_path=save_path)
-        count += 1
-        
-        if count % 100 == 0:
-            elapsed = time.time() - start_time
-            avg_time = elapsed / count
-            remaining = len(image_box_sizes) - count
-            est_remaining = avg_time * remaining
-            print(f"Progress: {count}/{len(image_box_sizes)} | Elapsed: {elapsed/60:.1f}min | Est. remaining: {est_remaining/60:.1f}min")
-    
-    total_time = time.time() - start_time
-    print(f"Total time: {total_time/60:.1f} minutes ({total_time/3600:.2f} hours)")
 
-print ("------------------------------Done!-------------------------------")
+if MODE == 'collect':
+    print("=" * 70)
+    print("MODE: COLLECT - Gathering colorbar ranges from all frames")
+    print("=" * 70)
+    
+    if parallelize:
+        print(f"Using {num_cores} cores for parallel processing...")
+        print(f"Total frames to process: {len(image_box_sizes)}")
+        
+        # Create arguments list: (count, image_box_size) pairs
+        args_list = [(i, box_size) for i, box_size in enumerate(image_box_sizes)]
+        
+        # Run in parallel with maxtasksperchild to avoid memory issues
+        start_time = time.time()
+        with Pool(num_cores, maxtasksperchild=50) as pool:
+            results = pool.map(collect_wrapper, args_list)
+        
+        # Collect results
+        for count, ranges in results:
+            colorbar_ranges[count] = ranges
+        
+        total_time = time.time() - start_time
+        print(f"Collection time: {total_time/60:.1f} minutes ({total_time/3600:.2f} hours)")
+    else:
+        print(f"Total frames to process: {len(image_box_sizes)}")
+        start_time = time.time()
+        for count, image_box_size in enumerate(image_box_sizes):
+            ranges = collect_colorbar_ranges(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920)
+            colorbar_ranges[count] = ranges
+            
+            if (count + 1) % 100 == 0:
+                elapsed = time.time() - start_time
+                avg_time = elapsed / (count + 1)
+                remaining = len(image_box_sizes) - (count + 1)
+                est_remaining = avg_time * remaining
+                print(f"Collecting Progress: {count+1}/{len(image_box_sizes)} | Elapsed: {elapsed/60:.1f}min | Est. remaining: {est_remaining/60:.1f}min")
+        
+        total_time = time.time() - start_time
+        print(f"Collection time: {total_time/60:.1f} minutes ({total_time/3600:.2f} hours)")
+    
+    # Save collected ranges
+    save_colorbar_ranges(colorbar_ranges, save_path)
+    print("\nColorbar ranges collected and saved!")
+    print("Next step: Change MODE to 'plot' and run again to generate images with smooth colorbars.")
+
+elif MODE == 'plot':
+    print("=" * 70)
+    print("MODE: PLOT - Creating images with smoothly interpolated colorbars")
+    print("=" * 70)
+    
+    # Load and interpolate colorbar ranges
+    interpolated_ranges = load_and_interpolate_colorbar_ranges(save_path, len(image_box_sizes))
+    
+    if interpolated_ranges is None:
+        print("Error: Could not load colorbar ranges. Exiting.")
+    else:
+        if parallelize:
+            print(f"Using {num_cores} cores for parallel processing...")
+            print(f"Total frames to process: {len(image_box_sizes)}")
+            
+            # Create arguments list: (count, image_box_size) pairs
+            args_list = [(i, box_size) for i, box_size in enumerate(image_box_sizes)]
+            
+            # Run in parallel with maxtasksperchild to avoid memory issues
+            start_time = time.time()
+            with Pool(num_cores, maxtasksperchild=50) as pool:
+                pool.map(plot_wrapper, args_list)
+            
+            total_time = time.time() - start_time
+            print(f"Total plotting time: {total_time/60:.1f} minutes ({total_time/3600:.2f} hours)")
+        else:
+            print(f"Total frames to process: {len(image_box_sizes)}")
+            start_time = time.time()
+            for count, image_box_size in enumerate(image_box_sizes):
+                colorbar_limits = interpolated_ranges[count]
+                plot_image(count, com, pdata, stardata, image_box_size, gas_dists, axes[count], angle_degs[count], res=1920, fire_units=True, aspect="rectangle", cmap='cividis', save_path=save_path, colorbar_limits=colorbar_limits)
+                
+                if (count + 1) % 100 == 0:
+                    elapsed = time.time() - start_time
+                    avg_time = elapsed / (count + 1)
+                    remaining = len(image_box_sizes) - (count + 1)
+                    est_remaining = avg_time * remaining
+                    print(f"Plotting Progress: {count+1}/{len(image_box_sizes)} | Elapsed: {elapsed/60:.1f}min | Est. remaining: {est_remaining/60:.1f}min")
+            
+            total_time = time.time() - start_time
+            print(f"Total plotting time: {total_time/60:.1f} minutes ({total_time/3600:.2f} hours)")
+
+else:
+    print(f"Error: Invalid MODE '{MODE}'. Must be 'collect' or 'plot'.")
+
+print ("\n" + "="*70)
+print ("Done!")
+print ("="*70)
 
 
 
