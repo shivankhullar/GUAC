@@ -38,7 +38,11 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
             pdata[field] = F["PartType0"][field][:]#[density_cut]
     elif movie_tag:
         for field in "Masses", "Coordinates", "SmoothingLength", "Velocities", "Temperature": #, "MagneticField", "Potential":
-            pdata[field] = F["PartType0"][field][:]#[density_cut]
+            try:
+                pdata[field] = F["PartType0"][field][:]#[density_cut]
+            except:
+                print(f'No {field} in this snapshot')
+                continue
     else:
         for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber": #, "MagneticField":
             pdata[field] = F["PartType0"][field][:]
@@ -99,6 +103,8 @@ def convert_units_to_physical(pdata, stardata, fire_stardata):
     for data_dict in data_dicts: 
         for key in data_dict.keys():
             if key == "Coordinates" or key == "SmoothingLength":
+                data_dict[key] = data_dict[key] * rconv
+            if key == "RefinementRegionCenter":
                 data_dict[key] = data_dict[key] * rconv
             elif key == "Velocities":
                 data_dict[key] = data_dict[key] * np.sqrt(a)
