@@ -71,7 +71,7 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
     fire_stardata = {}
     if 'PartType4' in F.keys():
         try:
-            for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber":
+            for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber", "StellarFormationTime":
                 fire_stardata[field] = F["PartType4"][field][:]#[density_cut]
 
             for key in F['Header'].attrs.keys():
@@ -104,7 +104,7 @@ def convert_units_to_physical(pdata, stardata, fire_stardata):
         for key in data_dict.keys():
             if key == "Coordinates" or key == "SmoothingLength":
                 data_dict[key] = data_dict[key] * rconv
-            if key == "RefinementRegionCenter":
+            elif key == "RefinementRegionCenter":
                 data_dict[key] = data_dict[key] * rconv
             elif key == "Velocities":
                 data_dict[key] = data_dict[key] * np.sqrt(a)
@@ -121,3 +121,34 @@ def convert_units_to_physical(pdata, stardata, fire_stardata):
         
 
     return pdata, stardata, fire_stardata
+
+
+def convert_quant_to_physical(array, key=None, a=None, h=None):
+    if a is None:
+        a = 1.0
+        print ("Using default value a=1.0")
+    if h is None:
+        h = 0.702 
+        print ("Using default value h=0.702")
+    hinv = 1.0 / h
+    rconv = a * hinv 
+    if key == "Coordinates" or key == "SmoothingLength":
+        physical_array = array * rconv
+    elif key == "RefinementRegionCenter":
+        physical_array = array * rconv
+    elif key == "Velocities":
+        physical_array = array * np.sqrt(a)
+    elif key == "Masses" or key == "BH_Mass" or key == "CosmicRayEnergy" or key == "PhotonEnergy":
+        physical_array = array * hinv
+    elif key == "Density" or key == "Pressure":
+        physical_array = array * hinv / (rconv**3)
+    elif key == "Acceleration" or key == "HydroAcceleration" or key == "VelocityGradient" or key == "RadiativeAcceleration":
+        physical_array = array * h
+    elif key == "DensityGradient":
+        physical_array = array * hinv / (hinv**4)
+    else:
+        print ("Unknown key... check source code")
+        return None
+
+
+    return physical_array
