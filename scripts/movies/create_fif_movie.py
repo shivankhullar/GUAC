@@ -344,7 +344,7 @@ gas_dists = np.linalg.norm(gas_pos, axis=1)
 #image_box_sizes_temp2 = np.repeat(2e-5,200)
 #image_box_sizes = np.append(image_box_sizes_temp1, image_box_sizes_temp2)
 
-image_box_sizes= np.append(np.logspace(np.log10(120), np.log10(1e-3), 450), np.append(np.logspace(np.log10(1e-3), np.log10(1e-6), 150), np.append(np.logspace(np.log10(1e-6), np.log10(2e-5), 100), np.repeat(2e-5,200))))
+image_box_sizes= np.append(np.logspace(np.log10(120), np.log10(1e-3), 450), np.append(np.logspace(np.log10(1e-3), np.log10(1e-6), 150 ), np.append(np.logspace(np.log10(1e-6), np.log10(2e-5), 100), np.repeat(2e-5,200))))
 axes = ["x"]*400+["z"]*300+["y"]*200
 angle_degs = np.append(np.linspace(0,360,400), np.append(np.repeat(0, 300), np.linspace(0, 90, 200)))
 
