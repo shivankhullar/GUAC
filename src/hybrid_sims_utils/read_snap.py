@@ -7,6 +7,7 @@ Date: Feb 2025
 """
 import h5py
 import numpy as np
+import yt
 #from galaxy_utils.gal_utils import *
 
 
@@ -37,7 +38,7 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
         for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber", "RefinementFlag": #, "MagneticField", "Potential":
             pdata[field] = F["PartType0"][field][:]#[density_cut]
     elif movie_tag:
-        for field in "Masses", "Coordinates", "SmoothingLength", "Velocities", "Temperature": #, "MagneticField", "Potential":
+        for field in "Masses", "Coordinates", "SmoothingLength", "Velocities", "Temperature","Density": #, "MagneticField", "Potential":
             try:
                 pdata[field] = F["PartType0"][field][:]#[density_cut]
             except:
@@ -152,3 +153,12 @@ def convert_quant_to_physical(array, key=None, a=None, h=None):
 
 
     return physical_array
+
+
+def convert_formation_times_to_ages(pdata, fire_stardata):
+    omega_matter = pdata['Omega_Matter']
+    omega_lambda = pdata['Omega_Lambda']
+    #omega_radi
+    hubble_constant = pdata['HubbleParam']
+
+    co = yt.utilities.cosmology.Cosmology(omega_matter=omega_matter, omega_lambda=omega_lambda, hubble_constant=hubble_constant, omega_radiation=omega_radiation)
