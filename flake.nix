@@ -87,10 +87,8 @@
           '';
           installPhase = ''
           	runHook preInstall
-          	
-          	# Install Python package
-          	mkdir -p $out/${python.python.sitePackages}
-          	cp -r .  $out/${python.python.sitePackages}/ewah_bool_utils
+          	${python.python.interpreter} setup.py install --prefix=$out
+          	runHook postInstall
           '';
 		  pythonImportsCheck = [ "ewah_bool_utils" ];
 		};
@@ -103,10 +101,10 @@
   		    # Add ewah_bool_utils import
   		    sed -i "/from importlib import resources as importlib_resources/a import ewah_bool_utils" setup.py
   		    
-  		    # Replace the problematic path lookup
+  		    # Replace the problematic path lookup (note: brackets must be escaped in sed)
   		    substituteInPlace setup.py \
-  		      --replace '[os.path.abspath(importlib_resources.files("ewah_bool_utils"))]' \
-  		                '[os.path.abspath(ewah_bool_utils.__path__[0])]'
+  		      --replace 'os.path.abspath(importlib_resources.files("ewah_bool_utils"))' \
+  		                'os.path.abspath(ewah_bool_utils.__path__[0])'
   		  '';
           src = pkgs.fetchPypi {
 		    inherit pname;
@@ -123,6 +121,10 @@
 			distutils
 			mypy
             numba
+			matplotlib
+			pillow
+			tomli-w
+			tqdm
           ];
           propagatedBuildInputs = with python; [
 		    setuptools
