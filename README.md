@@ -3,7 +3,7 @@
 This is a library to store utilities pertaining to GMCs identified in galaxy simulations (FIRE for now).
 
 
-Dependencies:
+Dependencies (*Python <= 3.10 is required!*)
 ```
 numpy
 scipy
@@ -12,6 +12,13 @@ docopt
 pfh_python
 meshoid
 glob
+yt
+h5py
+packaging
+pyparsing
+cycler
+colorcet
+numba
 ```
 
 

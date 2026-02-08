@@ -1,0 +1,12 @@
+numpy <= 1.23.0
+scipy <= 1.13.1
+matplotlib <= 3.9.0
+docopt
+meshoid
+yt
+h5py
+packaging
+pyparsing
+cycler
+colorcet
+numba <= 0.60.0
