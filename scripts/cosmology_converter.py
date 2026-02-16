@@ -80,21 +80,21 @@ def convert_single_value(co, redshift=None, scale_factor=None, time_myr=None):
     lookback_time_myr = current_age_myr - age_myr
     
     return {
-        'redshift': round(z, 6),
-        'scale_factor': round(a, 6), 
-        'age_myr': round(age_myr, 3),
-        'lookback_time_myr': round(lookback_time_myr, 3),
-        'current_age_myr': round(current_age_myr, 3)
+        'redshift': z,
+        'scale_factor': a, 
+        'age_myr': age_myr,
+        'lookback_time_myr': lookback_time_myr,
+        'current_age_myr': current_age_myr
     }
 
 
 def print_conversion_result(result):
     """Print formatted conversion results."""
-    print(f"Redshift (z):              {result['redshift']}")
-    print(f"Scale factor (a):          {result['scale_factor']}")
-    print(f"Age of universe:           {result['age_myr']:.3f} Myr")
-    print(f"Lookback time:             {result['lookback_time_myr']:.3f} Myr")
-    print(f"Current age (z=0):         {result['current_age_myr']:.3f} Myr")
+    print(f"Redshift (z):              {result['redshift']:.7f}")
+    print(f"Scale factor (a):          {result['scale_factor']:.7f}")
+    print(f"Age of universe:           {result['age_myr']:.7f} Myr")
+    print(f"Lookback time:             {result['lookback_time_myr']:.7f} Myr")
+    print(f"Current age (z=0):         {result['current_age_myr']:.7f} Myr")
 
 
 def convert_file(co, filename, file_format='time', output_file=None):
@@ -169,8 +169,8 @@ def write_results_to_file(results, output_file, input_format):
         f.write("# Columns: redshift, scale_factor, age_myr, lookback_time_myr\n")
         
         for result in results:
-            f.write(f"{result['redshift']:.6f} {result['scale_factor']:.6f} "
-                   f"{result['age_myr']:.3f} {result['lookback_time_myr']:.3f}\n")
+            f.write(f"{result['redshift']:.7f} {result['scale_factor']:.7f} "
+                   f"{result['age_myr']:.7f} {result['lookback_time_myr']:.7f}\n")
 
 
 def parse_arguments():
