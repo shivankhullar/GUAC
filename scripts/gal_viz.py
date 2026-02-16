@@ -10,6 +10,7 @@ Options:
     --path=<path>                                       Path to the simulation directory [default: ./]
     --sim=<sim>                                         Simulation name [default: ]
     --snapnum=<snapnum>                                 Snapshot number [default: 600]
+    --snapnum_range=<snapnum_range>                     Range of snapshots to process (e.g., 0,100) [default: ]
     --r_gal=<r_gal>                                     Galaxy radius [default: 25]
     --h=<h>                                             Scale height [default: 0.4] 
     --save_path=<save_path>                             Path to save the images [default: img_data/]
@@ -21,6 +22,7 @@ Options:
     --img_filename_mode=<img_filename_mode>             Mode for image filename [default: 0]
     --image_box_size=<image_box_size>                   Size of the image box [default: 35]
     --center_and_proj=<center_and_proj>                 Find center and project galaxy [default: False]
+    --num_processes=<num_processes>                     Number of parallel processes [default: 8]
 """
 
 from docopt import docopt
@@ -31,6 +33,8 @@ from meshoid import Meshoid
 from matplotlib import colors
 from visualization.image_maker import edgeon_faceon_projection
 import os
+from multiprocessing import Pool
+from functools import partial
 
 def make_photo(path, snapnum, save_path):
     edgeon_faceon_projection(path,   #snapshot director
@@ -154,12 +158,55 @@ def plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, image_box_size=3
     return
 
 
+def process_snapshot_viz(snapnum, path, sim, r_gal, h, save_path, cb_range, image_box_size, snapdir, 
+                         gas_data_sub_dir, star_data_sub_dir, image_filename_prefix, 
+                         image_filename_suffix, img_filename_mode):
+    """Wrapper function for parallel processing"""
+    try:
+        print("==============================================================")
+        print("Processing snapshot: ", snapnum)
+        
+        # Setup params for this snapshot
+        start_snap = 591
+        last_snap = 614
+        filename_prefix = "Linked_Clouds_"
+        cloud_num_digits = 4
+        snapshot_num_digits = 4
+        cloud_prefix = "Cloud"
+        hdf5_file_prefix = 'Clouds_'
+        age_cut = 1
+        dat_file_header_size = 8
+        snapshot_prefix = "Snap"
+        cph_sub_dir = "CloudPhinderData/"
+        frac_thresh = 'thresh0.0'
+        nmin = 10
+        vir = 5
+        sub_dir = "CloudTrackerData/n{nmin}_alpha{vir}/".format(nmin=nmin, vir=vir)
+        image_path = 'img_data/'
+        
+        params = Params(path, nmin, vir, sub_dir, start_snap, last_snap, filename_prefix, cloud_num_digits,
+                       snapshot_num_digits, cloud_prefix, snapshot_prefix, age_cut,
+                       dat_file_header_size, gas_data_sub_dir, star_data_sub_dir, cph_sub_dir,
+                       image_path, image_filename_prefix,
+                       image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim, r_gal=r_gal, h=h)
+        
+        plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, image_box_size=image_box_size, snapdir=snapdir)
+        
+        print("Completed snapshot: ", snapnum)
+        print("==============================================================")
+        return snapnum, True
+    except Exception as e:
+        print(f"Error processing snapshot {snapnum}: {e}")
+        return snapnum, False
+
+
 if __name__ == '__main__':
     args = docopt(__doc__)
     path = args['--path']
     sim = args['--sim']
     snapdir = args['--snapdir']
     snapnum = int(args['--snapnum'])
+    snapnum_range = args['--snapnum_range']
     r_gal = float(args['--r_gal'])
     h = float(args['--h'])
     cb_range = convert_to_array(args['--colorbar_range'], dtype=np.float64)
@@ -169,20 +216,29 @@ if __name__ == '__main__':
     image_filename_prefix = args['--img_filename_prefix']
     image_filename_suffix = args['--img_filename_suffix']
     img_filename_mode = int(args['--img_filename_mode'])
-    image_box_size=int(args['--image_box_size'])
+    image_box_size = int(args['--image_box_size'])
+    num_processes = int(args['--num_processes'])
 
     image_path = path+'img_data/'
 
     if args['--center_and_proj'] == 'True':
-        print ("Finding center and projection matrix...")
-        make_photo(path, snapnum, save_path)
+        print("Finding center and projection matrix...")
+        # If snapnum_range is provided, process range
+        if snapnum_range:
+            snap_range = convert_to_array(snapnum_range, dtype=np.int32)
+            if len(snap_range) == 2:
+                for snap in range(snap_range[0], snap_range[1] + 1):
+                    make_photo(path, snap, save_path)
+            else:
+                print("Invalid snapnum_range format. Use: start,end")
+                exit(1)
+        else:
+            make_photo(path, snapnum, save_path)
         img_filename_mode = 1
         image_path = save_path
     else:
-        print ("Using center and projection projection from existing file...")
+        print("Using center and projection projection from existing file...")
         pass
-        
-
 
     # 0: Do nothing, use default
     # 1: Use center_proj_*.hdf5
@@ -196,35 +252,68 @@ if __name__ == '__main__':
     elif img_filename_mode == 0:
         pass
     else:
-        print ("Invalid image filename mode, should be 0, 1 or 2...")
+        print("Invalid image filename mode, should be 0, 1 or 2...")
         exit(1)
 
-    ## Some bookkeeping
-    start_snap = 591    #Dummy if considering only one snapshot
-    last_snap = 614     #Dummy if considering only one snapshot
-    filename_prefix = "Linked_Clouds_"
-    cloud_num_digits = 4
-    snapshot_num_digits = 4
-    cloud_prefix = "Cloud"
-    
-    #image_filename_prefix = 'center_proj_'
-    #image_filename_suffix = '.hdf5'
-    hdf5_file_prefix = 'Clouds_'
-    age_cut = 1
-    dat_file_header_size=8
-    snapshot_prefix="Snap"
-    cph_sub_dir="CloudPhinderData/"
-    frac_thresh='thresh0.0'
-    nmin = 10
-    vir = 5
-    sub_dir = "CloudTrackerData/n{nmin}_alpha{vir}/".format(nmin=nmin, vir=vir)
-    #sim=sim
-    image_path = 'img_data/'
+    # Determine which snapshots to process
+    snap_num_list = None
+    if snapnum_range:
+        snap_range = convert_to_array(snapnum_range, dtype=np.int32)
+        if len(snap_range) == 2:
+            snap_num_list = np.arange(snap_range[0], snap_range[1] + 1)
+            print(f"Processing snapshot range: {snap_range[0]} to {snap_range[1]}")
+        else:
+            print("Invalid snapnum_range format. Use: start,end")
+            exit(1)
+    else:
+        snap_num_list = [snapnum]
 
-    params = Params(path, nmin, vir, sub_dir, start_snap, last_snap, filename_prefix, cloud_num_digits, \
-                    snapshot_num_digits, cloud_prefix, snapshot_prefix, age_cut, \
-                    dat_file_header_size, gas_data_sub_dir, star_data_sub_dir, cph_sub_dir,\
-                    image_path, image_filename_prefix,\
-                    image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim, r_gal=r_gal, h=h)
+    # Process snapshots
+    if len(snap_num_list) > 1:
+        print(f"Processing {len(snap_num_list)} snapshots using {num_processes} parallel processes...")
+        
+        # Create partial function with fixed parameters
+        process_func = partial(process_snapshot_viz, 
+                              path=path, sim=sim, r_gal=r_gal, h=h, 
+                              save_path=save_path, cb_range=cb_range, 
+                              image_box_size=image_box_size, snapdir=snapdir,
+                              gas_data_sub_dir=gas_data_sub_dir, 
+                              star_data_sub_dir=star_data_sub_dir,
+                              image_filename_prefix=image_filename_prefix, 
+                              image_filename_suffix=image_filename_suffix,
+                              img_filename_mode=img_filename_mode)
+        
+        # Use multiprocessing pool
+        with Pool(processes=num_processes) as pool:
+            results = pool.map(process_func, snap_num_list)
+        
+        # Report results
+        successful = sum(1 for _, success in results if success)
+        print(f"\nCompleted: {successful}/{len(snap_num_list)} snapshots processed successfully")
+    else:
+        # Single snapshot processing
+        ## Some bookkeeping
+        start_snap = 591
+        last_snap = 614
+        filename_prefix = "Linked_Clouds_"
+        cloud_num_digits = 4
+        snapshot_num_digits = 4
+        cloud_prefix = "Cloud"
+        hdf5_file_prefix = 'Clouds_'
+        age_cut = 1
+        dat_file_header_size = 8
+        snapshot_prefix = "Snap"
+        cph_sub_dir = "CloudPhinderData/"
+        frac_thresh = 'thresh0.0'
+        nmin = 10
+        vir = 5
+        sub_dir = "CloudTrackerData/n{nmin}_alpha{vir}/".format(nmin=nmin, vir=vir)
+        image_path = 'img_data/'
 
-    plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, image_box_size=image_box_size, snapdir=snapdir)
+        params = Params(path, nmin, vir, sub_dir, start_snap, last_snap, filename_prefix, cloud_num_digits,
+                       snapshot_num_digits, cloud_prefix, snapshot_prefix, age_cut,
+                       dat_file_header_size, gas_data_sub_dir, star_data_sub_dir, cph_sub_dir,
+                       image_path, image_filename_prefix,
+                       image_filename_suffix, hdf5_file_prefix, frac_thresh, sim=sim, r_gal=r_gal, h=h)
+
+        plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, image_box_size=image_box_size, snapdir=snapdir)
