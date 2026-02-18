@@ -150,8 +150,8 @@ def plot_galaxy(params, snapnum, r_gal, h, save_path, cb_range, image_box_size=3
     # Make save directory if it doesn't exist
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    plt.savefig(save_path+'proj_{snap}.png'.format(snap=snapnum), dpi=300)
-    print ("Saved image to {}".format(save_path+'proj_{snap}.png'.format(snap=snapnum)))
+    plt.savefig(save_path+'proj_{snap:04d}.png'.format(snap=snapnum), dpi=300)
+    print ("Saved image to {}".format(save_path+'proj_{snap:04d}.png'.format(snap=snapnum)))
     #plt.show()
     plt.close()
 
