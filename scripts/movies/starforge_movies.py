@@ -132,7 +132,7 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
                                     pad=1,
                                     color='white',
                                     frameon=False,
-                                    size_vertical=0.1,
+                                    size_vertical=scale_bar_size/10,
                                     fontproperties=fontprops)
         ax.add_artist(scalebar)
         
