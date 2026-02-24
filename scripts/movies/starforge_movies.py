@@ -6,7 +6,7 @@ Usage: starforge_movies_simple.py [options]
 
 Options:
     -h, --help                                          Show this screen
-    --snapdir=<snapdir>                                 Are snapshots in a snapdir or snapshot directory? [default: True]
+    --snapdir=<snapdir>                                 Are snapshots in a snapdir or snapshot directory? [default: False]
     --path=<path>                                       Path to the snapshot directory [default: ./]
     --save_path=<save_path>                             Path to save the images [default: ./movies/]
     --image_box_size=<image_box_size>                   Size of the image box (fraction of BoxSize) [default: 0.4]
