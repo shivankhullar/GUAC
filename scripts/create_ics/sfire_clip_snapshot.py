@@ -17,6 +17,7 @@ Options:
     --snap_num=<snap_num>                                           Snapshot number to clip [default: 100]
     --ic_path=<ic_path>                                             Path to save the IC file [default: ./] 
     --dist_cut_off=<dist_cut_off>                                   Distance cut off for gas particles to be used in finding COM velocity (in kpc) [default: 0.1]
+    --dist_cut_off_physical=<dist_cut_off_physical>                 Is the distance cut off in physical units? [default: False]
     --use_refine_center_from_file=<use_refine_center_from_file>     Use the refine center from the file? [default: True]
     --refine_center_coords=<refine_center_coords>                   Refinement center coords (leave empty if using from file) [default: 0,0,0]
 """
@@ -26,6 +27,7 @@ from cloud_utils.cloud_quants import *
 from cloud_utils.cloud_utils import *
 from cloud_utils.cloud_selection import *
 from generic_utils.script_utils import *
+from hybrid_sims_utils.read_snap import *
 from docopt import docopt
 
 #import numpy as np
@@ -34,7 +36,7 @@ import os
 
 
 
-def clip_hdf5_file(snap_num, cut_off_distance, path, ic_path, use_refine_center_from_file, refine_center_coords=None, snapdir=False):
+def clip_hdf5_file(snap_num, dist_cut_off, path, ic_path, use_refine_center_from_file, refine_center_coords=None, snapdir=False, dist_cut_off_physical=False):
     """
     This is a function to create an hdf5 file with just the particles within a certain distance of the custom position.
     Inputs:
@@ -49,15 +51,16 @@ def clip_hdf5_file(snap_num, cut_off_distance, path, ic_path, use_refine_center_
 
     print ('Reading file....')
     if snapdir:
-        file_name = path+'snapdir_{snap_num}/snapshot_{snap_num}.hdf5'.format(snap_num=snap_num)
+        file_name = path+f'snapdir_{snap_num:03d}/snapshot_{snap_num:03d}.hdf5'
     else:
-        file_name = path+'snapshot_{snap_num}.hdf5'.format(snap_num=snap_num)
+        file_name = path+f'snapshot_{snap_num:03d}.hdf5'
     f = h5py.File(file_name, 'r')
     header_data_dict = {}
     gas_data_dict = {}
     star_data_dict = {}
-    dm_data_dict = {}
-    collisionless_data_dict = {}
+    dm1_data_dict = {}
+    #dm2_data_dict = {}
+    #collisionless_data_dict = {}
     sink_data_dict = {}
     for key in f.keys():
         if key == 'Header':
@@ -69,6 +72,18 @@ def clip_hdf5_file(snap_num, cut_off_distance, path, ic_path, use_refine_center_
             for key2 in f[key].keys():
                 gas_data_dict[key2] = np.array(f[key][key2])
             print ("Loaded gas data")
+
+
+        if key == 'PartType1':
+            for key2 in f[key].keys():
+                dm1_data_dict[key2] = np.array(f[key][key2])
+            print ("Loaded dm1 data")
+
+        #if key == 'PartType2':
+        #    for key2 in f[key].keys():
+        #        dm2_data_dict[key2] = np.array(f[key][key2])
+        #    print ("Loaded dm2 data")
+
 
         if key == 'PartType4':
             for key2 in f[key].keys():
@@ -86,19 +101,32 @@ def clip_hdf5_file(snap_num, cut_off_distance, path, ic_path, use_refine_center_
         refine_center_coords = header_data_dict['RefinementRegionCenter']
     print ("Refine center coords: ", refine_center_coords)
 
+    # Convert to physical units
+    if dist_cut_off_physical:
+        cut_off_distance = convert_quant_from_physical(dist_cut_off, key="Coordinates", a=header_data_dict["Time"], h=header_data_dict["HubbleParam"])
+        print ("Distance cut off in code units: ", cut_off_distance)
+
+
     # Find the particles that are within a certain distance of the custom position
     gas_dist_from_refine_coords = np.linalg.norm(gas_data_dict['Coordinates'] - refine_center_coords, axis=1)
     gas_inds = np.where(gas_dist_from_refine_coords<cut_off_distance)[0]
-    star_dist_from_refine_coords = np.linalg.norm(star_data_dict['Coordinates'] - refine_center_coords, axis=1)
-    star_inds = np.where(star_dist_from_refine_coords<cut_off_distance)[0]
-    sink_dist_from_refine_coords = np.linalg.norm(sink_data_dict['Coordinates'] - refine_center_coords, axis=1)
-    sink_inds = np.where(sink_dist_from_refine_coords<cut_off_distance)[0]
-    
     print ("Number of gas particles within cut off distance:", len(gas_inds))
-    print ("Number of star particles within cut off distance:", len(star_inds))
-    print ("Number of sink particles within cut off distance:", len(sink_inds))
-
-
+    if dm1_data_dict:
+        dm1_dist_from_refine_coords = np.linalg.norm(dm1_data_dict['Coordinates'] - refine_center_coords, axis=1)
+        dm1_inds = np.where(dm1_dist_from_refine_coords<cut_off_distance)[0]
+        print ("Number of dm1 particles within cut off distance:", len(dm1_inds))
+    #if dm2_data_dict:
+    #    dm2_dist_from_refine_coords = np.linalg.norm(dm2_data_dict['Coordinates'] - refine_center_coords, axis=1)
+    #    dm2_inds = np.where(dm2_dist_from_refine_coords<cut_off_distance)[0]
+    if star_data_dict:
+        star_dist_from_refine_coords = np.linalg.norm(star_data_dict['Coordinates'] - refine_center_coords, axis=1)
+        star_inds = np.where(star_dist_from_refine_coords<cut_off_distance)[0]
+        print ("Number of star particles within cut off distance:", len(star_inds))
+    if sink_data_dict:
+        sink_dist_from_refine_coords = np.linalg.norm(sink_data_dict['Coordinates'] - refine_center_coords, axis=1)
+        sink_inds = np.where(sink_dist_from_refine_coords<cut_off_distance)[0]
+        print ("Number of sink particles within cut off distance:", len(sink_inds))
+    
     # Now we can create the new hdf5 file with just the clipped particles
     print ('Writing to file now ....')
 
@@ -112,9 +140,14 @@ def clip_hdf5_file(snap_num, cut_off_distance, path, ic_path, use_refine_center_
         if key=='NumPart_ThisFile' or key=='NumPart_Total':
             arr = np.zeros(6)
             #header_data_dict['NumPart_ThisFile']
-            arr[0] = len(gas_inds)
-            arr[4] = len(star_inds)
-            arr[5] = len(sink_inds)
+            if gas_data_dict:
+                arr[0] = len(gas_inds)
+            if dm1_data_dict:
+                arr[1] = len(dm1_inds)
+            if star_data_dict:
+                arr[4] = len(star_inds)
+            if sink_data_dict:
+                arr[5] = len(sink_inds)
             header.attrs.create(key, arr)
         #if key=='BoxSize':
         else:
@@ -123,6 +156,10 @@ def clip_hdf5_file(snap_num, cut_off_distance, path, ic_path, use_refine_center_
     part0 = f.create_group('PartType0')
     for key in gas_data_dict.keys():
         part0.create_dataset(key, data=gas_data_dict[key][gas_inds])
+
+    part1 = f.create_group('PartType1')
+    for key in dm1_data_dict.keys():
+        part1.create_dataset(key, data=dm1_data_dict[key][dm1_inds])
     
     part4 = f.create_group('PartType4')
     for key in star_data_dict.keys():
@@ -152,6 +189,7 @@ if __name__ == '__main__':
     dist_cut_off = float(args['--dist_cut_off'])
     use_refine_center_from_file = convert_to_bool(args['--use_refine_center_from_file'])
     refine_center_coords = convert_to_array(args['--refine_center_coords'])
+    dist_cut_off_physical = convert_to_bool(args['--dist_cut_off_physical'])
 
 
     
@@ -164,7 +202,7 @@ if __name__ == '__main__':
     if use_refine_center_from_file:
         refine_center_coords = None
 
-    clip_hdf5_file(snap_num, dist_cut_off, path, ic_path, use_refine_center_from_file, refine_center_coords, snapdir)
+    clip_hdf5_file(snap_num, dist_cut_off, path, ic_path, use_refine_center_from_file, refine_center_coords, snapdir, dist_cut_off_physical)
     print("HDF5 file created successfully")
 
 
