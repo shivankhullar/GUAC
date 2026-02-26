@@ -150,6 +150,37 @@ def convert_quant_to_physical(array, key=None, a=None, h=None):
     else:
         print ("Unknown key... check source code")
         return None
+    return physical_array
+
+
+
+def convert_quant_from_physical(array, key=None, a=None, h=None):
+    if a is None:
+        a = 1.0
+        print ("Using default value a=1.0")
+    if h is None:
+        h = 0.702 
+        print ("Using default value h=0.702")
+    hinv = 1.0 / h
+    rconv = a * hinv
+    rconv_inv = 1.0 / rconv 
+    if key == "Coordinates" or key == "SmoothingLength":
+        physical_array = array * rconv_inv
+    elif key == "RefinementRegionCenter":
+        physical_array = array * rconv_inv
+    elif key == "Velocities":
+        physical_array = array / np.sqrt(a)
+    elif key == "Masses" or key == "BH_Mass" or key == "CosmicRayEnergy" or key == "PhotonEnergy":
+        physical_array = array * h
+    elif key == "Density" or key == "Pressure":
+        physical_array = array * h / (rconv_inv**3)
+    elif key == "Acceleration" or key == "HydroAcceleration" or key == "VelocityGradient" or key == "RadiativeAcceleration":
+        physical_array = array * hinv
+    elif key == "DensityGradient":
+        physical_array = array * h / (h**4)
+    else:
+        print ("Unknown key... check source code")
+        return None
 
 
     return physical_array
