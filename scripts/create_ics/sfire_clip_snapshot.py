@@ -133,7 +133,7 @@ def clip_hdf5_file(snap_num, dist_cut_off, path, ic_path, use_refine_center_from
     if not os.path.exists(ic_path):
         os.makedirs(ic_path)
 
-    file_name = ic_path+'snapshot_{snap_num}.hdf5'.format(snap_num=snap_num)
+    file_name = ic_path+f'snapshot_{snap_num:03d}.hdf5'
     f = h5py.File(file_name, 'w')
     header = f.create_group('Header')
     for key in header_data_dict.keys():
