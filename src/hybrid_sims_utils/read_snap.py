@@ -12,8 +12,48 @@ import yt
 
 
 
-def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, refinement_tag=False, verbose=True, full_tag=False, movie_tag=False):
+def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, refinement_tag=False, verbose=True, full_tag=False, movie_tag=False, custom_gas_fields=None, custom_star_fields=None):
+    """
+    Read hybrid (FIRE+STARFORGE) simulation snapshot data.
 
+    Parameters
+    ----------
+    sim : str
+        Simulation name/identifier.
+    sim_path : str
+        Path to the simulation directory.
+    snap : int
+        Snapshot number to read.
+    snapshot_suffix : str, optional
+        Suffix to append to snapshot filename (default: '').
+    snapdir : bool, optional
+        If True, assumes snapshots are in a 'snapshots/' subdirectory (default: True).
+    refinement_tag : bool, optional
+        If True, reads refinement-specific fields (default: False).
+    verbose : bool, optional
+        If True, prints filename being read (default: True).
+    full_tag : bool, optional
+        If True, reads all available PartType0 fields (default: False).
+    movie_tag : bool, optional
+        If True, reads movie-specific fields (default: False).
+    custom_gas_fields : list of str, optional
+        Custom list of PartType0 (gas) fields to read. Overrides other field selection options.
+    custom_star_fields : list of str, optional
+        Custom list of PartType5 (STARFORGE stars) fields to read. Overrides default star fields.
+
+    Returns
+    -------
+    pdata : dict
+        Dictionary containing PartType0 (gas) particle data and header attributes.
+    stardata : dict
+        Dictionary containing PartType5 (STARFORGE stars) particle data.
+    fire_stardata : dict
+        Dictionary containing PartType4 (FIRE stars) particle data.
+    refine_data : dict
+        Dictionary containing PartType3 (refinement) particle data.
+    snapname : str
+        Name of the snapshot file that was read.
+    """
     if snap<10:
         snapname = 'snapshot_'+snapshot_suffix+'00{num}'.format(num=snap) 
     elif snap>=10 and snap<100:
@@ -31,7 +71,14 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
     
     F = h5py.File(filename,"r")
     pdata = {}
-    if full_tag:
+    if custom_gas_fields is not None:
+        for field in custom_gas_fields:
+            try:
+                pdata[field] = F["PartType0"][field][:]
+            except:
+                print(f'Warning: Field {field} not found in PartType0')
+                continue
+    elif full_tag:
         for field in F['PartType0'].keys():
             pdata[field] = F["PartType0"][field][:]
     elif refinement_tag:
@@ -59,10 +106,18 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
     stardata = {}
     if 'PartType5' in F.keys():
         try:
-            #for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber", "StellarFormationTime":
-            #    stardata[field] = F["PartType5"][field][:]#[density_cut]
-            for field in F['PartType5'].keys():
-                stardata[field] = F["PartType5"][field][:]
+            if custom_star_fields is not None:
+                for field in custom_star_fields:
+                    try:
+                        stardata[field] = F["PartType5"][field][:]
+                    except:
+                        print(f'Warning: Field {field} not found in PartType5')
+                        continue
+            else:
+                #for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber", "StellarFormationTime":
+                #    stardata[field] = F["PartType5"][field][:]#[density_cut]
+                for field in F['PartType5'].keys():
+                    stardata[field] = F["PartType5"][field][:]
 
             for key in F['Header'].attrs.keys():
                 stardata[key] = F['Header'].attrs[key]
@@ -94,6 +149,39 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
 
 
 def convert_units_to_physical(pdata, stardata, fire_stardata):
+    """
+    Convert simulation units to physical units for particle data.
+
+    Applies appropriate conversion factors to various fields based on their physical nature,
+    accounting for scale factor (a) and Hubble parameter (h) dependencies.
+
+    Parameters
+    ----------
+    pdata : dict
+        Dictionary containing PartType0 (gas) particle data with 'Time' and 'HubbleParam'.
+    stardata : dict
+        Dictionary containing PartType5 (STARFORGE stars) particle data.
+    fire_stardata : dict
+        Dictionary containing PartType4 (FIRE stars) particle data.
+
+    Returns
+    -------
+    pdata : dict
+        Gas particle data with fields converted to physical units.
+    stardata : dict
+        STARFORGE star data with fields converted to physical units.
+    fire_stardata : dict
+        FIRE star data with fields converted to physical units.
+
+    Notes
+    -----
+    Conversion factors applied:
+    - Coordinates, SmoothingLength: multiplied by a/h
+    - Velocities: multiplied by sqrt(a)
+    - Masses: multiplied by 1/h
+    - Density, Pressure: multiplied by h/(a/h)^3
+    - Acceleration: multiplied by h
+    """
     if pdata:
         a = pdata['Time']
         h = pdata['HubbleParam']
@@ -125,6 +213,31 @@ def convert_units_to_physical(pdata, stardata, fire_stardata):
 
 
 def convert_quant_to_physical(array, key=None, a=None, h=None):
+    """
+    Convert a single quantity from simulation units to physical units.
+
+    Parameters
+    ----------
+    array : numpy.ndarray
+        Array containing the quantity to convert.
+    key : str, optional
+        Name of the field being converted (determines conversion factor).
+        Options: "Coordinates", "SmoothingLength", "RefinementRegionCenter",
+        "Velocities", "Masses", "Density", "Pressure", "Acceleration", etc.
+    a : float, optional
+        Scale factor (default: 1.0).
+    h : float, optional
+        Hubble parameter in units of 100 km/s/Mpc (default: 0.702).
+
+    Returns
+    -------
+    physical_array : numpy.ndarray
+        Array converted to physical units, or None if key is unknown.
+
+    Notes
+    -----
+    Returns None and prints a warning if the key is not recognized.
+    """
     if a is None:
         a = 1.0
         print ("Using default value a=1.0")
@@ -155,6 +268,33 @@ def convert_quant_to_physical(array, key=None, a=None, h=None):
 
 
 def convert_quant_from_physical(array, key=None, a=None, h=None):
+    """
+    Convert a single quantity from physical units back to simulation units.
+
+    Inverse operation of convert_quant_to_physical.
+
+    Parameters
+    ----------
+    array : numpy.ndarray
+        Array containing the quantity in physical units to convert back.
+    key : str, optional
+        Name of the field being converted (determines conversion factor).
+        Options: "Coordinates", "SmoothingLength", "RefinementRegionCenter",
+        "Velocities", "Masses", "Density", "Pressure", "Acceleration", etc.
+    a : float, optional
+        Scale factor (default: 1.0).
+    h : float, optional
+        Hubble parameter in units of 100 km/s/Mpc (default: 0.702).
+
+    Returns
+    -------
+    physical_array : numpy.ndarray
+        Array converted back to simulation units, or None if key is unknown.
+
+    Notes
+    -----
+    Returns None and prints a warning if the key is not recognized.
+    """
     if a is None:
         a = 1.0
         print ("Using default value a=1.0")
@@ -187,6 +327,28 @@ def convert_quant_from_physical(array, key=None, a=None, h=None):
 
 
 def convert_formation_times_to_ages(pdata, fire_stardata):
+    """
+    Convert stellar formation times to ages using cosmology.
+
+    Uses yt's cosmology utilities to compute stellar ages from formation times.
+
+    Parameters
+    ----------
+    pdata : dict
+        Dictionary containing gas particle data with cosmological parameters:
+        'Omega_Matter', 'Omega_Lambda', 'HubbleParam'.
+    fire_stardata : dict
+        Dictionary containing FIRE star particle data with 'StellarFormationTime'.
+
+    Returns
+    -------
+    TBD
+        Function appears incomplete.
+
+    Notes
+    -----
+    This function is incomplete and requires omega_radiation to be defined.
+    """
     omega_matter = pdata['Omega_Matter']
     omega_lambda = pdata['Omega_Lambda']
     #omega_radi
