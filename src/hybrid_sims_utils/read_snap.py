@@ -8,11 +8,14 @@ Date: Feb 2025
 import h5py
 import numpy as np
 import yt
-#from galaxy_utils.gal_utils import *
+from generic_utils.constants import *
+from yt.utilities.cosmology import Cosmology
+#from yt.units import parsec, Msun
 
 
-
-def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, refinement_tag=False, verbose=True, full_tag=False, movie_tag=False, custom_gas_fields=None, custom_star_fields=None):
+def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, refinement_tag=False, \
+                            verbose=True, full_tag=False, movie_tag=False, custom_gas_fields=None, custom_star_fields=None,\
+                                ignore_data_type=None):
     """
     Read hybrid (FIRE+STARFORGE) simulation snapshot data.
 
@@ -70,80 +73,88 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
         print ("Reading file:", filename)
     
     F = h5py.File(filename,"r")
-    pdata = {}
-    if custom_gas_fields is not None:
-        for field in custom_gas_fields:
-            try:
-                pdata[field] = F["PartType0"][field][:]
-            except:
-                print(f'Warning: Field {field} not found in PartType0')
-                continue
-    elif full_tag:
-        for field in F['PartType0'].keys():
-            pdata[field] = F["PartType0"][field][:]
-    elif refinement_tag:
-        for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber", "RefinementFlag": #, "MagneticField", "Potential":
-            pdata[field] = F["PartType0"][field][:]#[density_cut]
-    elif movie_tag:
-        for field in "Masses", "Coordinates", "SmoothingLength", "Velocities", "Temperature","Density": #, "MagneticField", "Potential":
-            try:
-                pdata[field] = F["PartType0"][field][:]#[density_cut]
-            except:
-                print(f'No {field} in this snapshot')
-                continue
-    else:
-        for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber": #, "MagneticField":
-            pdata[field] = F["PartType0"][field][:]
-
-    try:
-        pdata['RefinementFlag'] = F["PartType0"]['RefinementFlag'][:]
-    except:
-        pass
-
+    header = {}
     for key in F['Header'].attrs.keys():
-        pdata[key] = F['Header'].attrs[key]
+        header[key] = F['Header'].attrs[key]
+
+    pdata = {}
+    if "gas" in ignore_data_type or 0 in ignore_data_type:
+        if custom_gas_fields is not None:
+            for field in custom_gas_fields:
+                try:
+                    pdata[field] = F["PartType0"][field][:]
+                except:
+                    print(f'Warning: Field {field} not found in PartType0')
+                    continue
+        elif full_tag:
+            for field in F['PartType0'].keys():
+                pdata[field] = F["PartType0"][field][:]
+        elif refinement_tag:
+            for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber", "RefinementFlag": #, "MagneticField", "Potential":
+                pdata[field] = F["PartType0"][field][:]#[density_cut]
+        elif movie_tag:
+            for field in "Masses", "Coordinates", "SmoothingLength", "Velocities", "Temperature","Density": #, "MagneticField", "Potential":
+                try:
+                    pdata[field] = F["PartType0"][field][:]#[density_cut]
+                except:
+                    print(f'No {field} in this snapshot')
+                    continue
+        else:
+            for field in "Masses", "Density", "Coordinates", "SmoothingLength", "Velocities", "ParticleIDs", "ParticleIDGenerationNumber": #, "MagneticField":
+                pdata[field] = F["PartType0"][field][:]
+
+        try:
+            pdata['RefinementFlag'] = F["PartType0"]['RefinementFlag'][:]
+        except:
+            pass
+
     
     stardata = {}
-    if 'PartType5' in F.keys():
-        try:
-            if custom_star_fields is not None:
-                for field in custom_star_fields:
-                    try:
+    if "sinks" in ignore_data_type or 5 in ignore_data_type:
+        if 'PartType5' in F.keys():
+            try:
+                if custom_star_fields is not None:
+                    for field in custom_star_fields:
+                        try:
+                            stardata[field] = F["PartType5"][field][:]
+                        except:
+                            print(f'Warning: Field {field} not found in PartType5')
+                            continue
+                else:
+                    #for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber", "StellarFormationTime":
+                    #    stardata[field] = F["PartType5"][field][:]#[density_cut]
+                    for field in F['PartType5'].keys():
                         stardata[field] = F["PartType5"][field][:]
-                    except:
-                        print(f'Warning: Field {field} not found in PartType5')
-                        continue
-            else:
-                #for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber", "StellarFormationTime":
-                #    stardata[field] = F["PartType5"][field][:]#[density_cut]
-                for field in F['PartType5'].keys():
-                    stardata[field] = F["PartType5"][field][:]
 
-            for key in F['Header'].attrs.keys():
-                stardata[key] = F['Header'].attrs[key]
-        except:
-            print('No STARFORGE stars data in this snapshot')
+                for key in F['Header'].attrs.keys():
+                    stardata[key] = F['Header'].attrs[key]
+            except:
+                print('No STARFORGE stars data in this snapshot')
 
     fire_stardata = {}
-    if 'PartType4' in F.keys():
-        try:
-            for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber", "StellarFormationTime":
-                fire_stardata[field] = F["PartType4"][field][:]#[density_cut]
+    if "stars" in ignore_data_type or 4 in ignore_data_type:
+        if 'PartType4' in F.keys():
+            try:
+                for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber", "StellarFormationTime":
+                    fire_stardata[field] = F["PartType4"][field][:]#[density_cut]
 
-            for key in F['Header'].attrs.keys():
-                fire_stardata[key] = F['Header'].attrs[key]
-        except:
-            print('No FIRE stars data in this snapshot')
+                for key in F['Header'].attrs.keys():
+                    fire_stardata[key] = F['Header'].attrs[key]
+            except:
+                print('No FIRE stars data in this snapshot')
+
+
     refine_data = {}
-    if 'PartType3' in F.keys():
-        for field in "Masses", "Coordinates", "Velocities":
-            refine_data[field] = F["PartType3"][field][:]#[density_cut]
+    if "refine" in ignore_data_type or 3 in ignore_data_type:
+        if 'PartType3' in F.keys():
+            for field in "Masses", "Coordinates", "Velocities":
+                refine_data[field] = F["PartType3"][field][:]#[density_cut]
 
     #refine_pos = np.array(F['PartType3/Coordinates'])
     #refine_pos = refine_pos[0]
     F.close()
 
-    return pdata, stardata, fire_stardata, refine_data, snapname
+    return header, pdata, stardata, fire_stardata, refine_data, snapname
 
 
 
@@ -326,6 +337,39 @@ def convert_quant_from_physical(array, key=None, a=None, h=None):
     return physical_array
 
 
+def convert_scale_factor_to_time(a, pdata):
+    """
+    Convert scale factor to time in Myr using cosmology.
+
+    Parameters
+    ----------
+    a : float
+        Scale factor to convert.
+    pdata : dict
+        Dictionary containing cosmological parameters 'Omega_Matter', 'Omega_Lambda', and 'HubbleParam'.
+
+    Returns
+    -------
+    age_myr : float
+        Age of the universe at the given scale factor in Myr.
+    """
+    omega_matter = pdata['Omega_Matter']
+    omega_lambda = pdata['Omega_Lambda']
+    if pdata['Omega_Radiation'] is not None:
+        omega_radiation = pdata['Omega_Radiation']
+    else:
+        print ("Omega_Radiation not found in particle data, using default value of 0.0")
+        omega_radiation = 0.0
+    hubble_constant = pdata['HubbleParam']
+
+    co = yt.utilities.cosmology.Cosmology(omega_matter=omega_matter, omega_lambda=omega_lambda, hubble_constant=hubble_constant, omega_radiation=omega_radiation)
+    
+    time_sec = float(co.t_from_a(a))
+    time_myr = time_sec / Myr
+
+    return time_myr
+
+
 def convert_formation_times_to_ages(pdata, fire_stardata):
     """
     INCOMPLETE:
@@ -352,7 +396,15 @@ def convert_formation_times_to_ages(pdata, fire_stardata):
     """
     omega_matter = pdata['Omega_Matter']
     omega_lambda = pdata['Omega_Lambda']
-    #omega_radi
+    if pdata['Omega_Radiation'] is not None:
+        omega_radiation = pdata['Omega_Radiation']
+    else:
+        print ("Omega_Radiation not found in particle data, using default value of 0.0")
+        omega_radiation = 0.0
     hubble_constant = pdata['HubbleParam']
+    sfts = fire_stardata['StellarFormationTime']
+
 
     co = yt.utilities.cosmology.Cosmology(omega_matter=omega_matter, omega_lambda=omega_lambda, hubble_constant=hubble_constant, omega_radiation=omega_radiation)
+    time_sec = float(co.t_from_a(a))
+    age_myr = time_sec / Myr
