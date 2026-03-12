@@ -78,9 +78,10 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
         header[key] = F['Header'].attrs[key]
 
     pdata = {}
-    if "gas" in ignore_data_type or 0 in ignore_data_type:
+    if ignore_data_type is not None:
+        if "gas" in ignore_data_type or 0 in ignore_data_type:
         #print ("Ignoring gas data as specified in ignore_data_type")
-        pass
+            pass
     else:
         if custom_gas_fields is not None:
             for field in custom_gas_fields:
@@ -113,8 +114,9 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
 
     
     stardata = {}
-    if "sinks" in ignore_data_type or 5 in ignore_data_type:
-        pass
+    if ignore_data_type is not None:
+        if "sinks" in ignore_data_type or 5 in ignore_data_type:
+            pass
     else:
         if 'PartType5' in F.keys():
             try:
@@ -137,8 +139,9 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
                 print('No STARFORGE stars data in this snapshot')
 
     fire_stardata = {}
-    if "stars" in ignore_data_type or 4 in ignore_data_type:
-        pass
+    if ignore_data_type is not None:
+        if "stars" in ignore_data_type or 4 in ignore_data_type:
+            pass
     else:
         if 'PartType4' in F.keys():
             try:
@@ -152,7 +155,10 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
 
 
     refine_data = {}
-    if "refine" in ignore_data_type or 3 in ignore_data_type:
+    if ignore_data_type is not None:
+        if "refine" in ignore_data_type or 3 in ignore_data_type:
+            pass
+    else:
         if 'PartType3' in F.keys():
             for field in "Masses", "Coordinates", "Velocities":
                 refine_data[field] = F["PartType3"][field][:]#[density_cut]
