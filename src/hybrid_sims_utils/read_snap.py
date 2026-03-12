@@ -79,6 +79,9 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
 
     pdata = {}
     if "gas" in ignore_data_type or 0 in ignore_data_type:
+        #print ("Ignoring gas data as specified in ignore_data_type")
+        pass
+    else:
         if custom_gas_fields is not None:
             for field in custom_gas_fields:
                 try:
@@ -111,6 +114,8 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
     
     stardata = {}
     if "sinks" in ignore_data_type or 5 in ignore_data_type:
+        pass
+    else:
         if 'PartType5' in F.keys():
             try:
                 if custom_star_fields is not None:
@@ -133,6 +138,8 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
 
     fire_stardata = {}
     if "stars" in ignore_data_type or 4 in ignore_data_type:
+        pass
+    else:
         if 'PartType4' in F.keys():
             try:
                 for field in "Masses", "Coordinates", "Velocities", "ParticleIDGenerationNumber", "StellarFormationTime":
@@ -159,7 +166,7 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
 
 
 
-def convert_units_to_physical(pdata, stardata, fire_stardata):
+def convert_units_to_physical(header, pdata, stardata, fire_stardata):
     """
     Convert simulation units to physical units for particle data.
 
@@ -168,6 +175,8 @@ def convert_units_to_physical(pdata, stardata, fire_stardata):
 
     Parameters
     ----------
+    header : dict
+        Dictionary containing simulation header information.
     pdata : dict
         Dictionary containing PartType0 (gas) particle data with 'Time' and 'HubbleParam'.
     stardata : dict
@@ -193,9 +202,9 @@ def convert_units_to_physical(pdata, stardata, fire_stardata):
     - Density, Pressure: multiplied by h/(a/h)^3
     - Acceleration: multiplied by h
     """
-    if pdata:
-        a = pdata['Time']
-        h = pdata['HubbleParam']
+    if header:
+        a = header['Time']
+        h = header['HubbleParam']
         hinv = 1.0 / h
         rconv = a * hinv 
 
@@ -219,8 +228,7 @@ def convert_units_to_physical(pdata, stardata, fire_stardata):
             else:
                 pass
         
-
-    return pdata, stardata, fire_stardata
+    return header, pdata, stardata, fire_stardata
 
 
 def convert_quant_to_physical(array, key=None, a=None, h=None):
