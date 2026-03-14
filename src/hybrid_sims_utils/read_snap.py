@@ -214,7 +214,7 @@ def convert_units_to_physical(header, pdata, stardata, fire_stardata):
         hinv = 1.0 / h
         rconv = a * hinv 
 
-    data_dicts = [pdata, stardata, fire_stardata]
+    data_dicts = [header, pdata, stardata, fire_stardata]
     for data_dict in data_dicts: 
         for key in data_dict.keys():
             if key == "Coordinates" or key == "SmoothingLength":
