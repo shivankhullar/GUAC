@@ -17,6 +17,8 @@ Options:
     --vmin=<vmin>                                       Minimum value for colorbar [default: 1]
     --vmax=<vmax>                                       Maximum value for colorbar [default: 2000]
     --center_on_stars=<center_on_stars>                 Center on stars instead of box center [default: False]
+    --cmap=<cmap>                                       Colormap name(s); comma-separate two to combine them [default: cet_fire]
+    --cmap_split=<cmap_split>                           Fraction of first colormap when combining two (0-1) [default: 0.5]
 """
 
 from generic_utils.fire_utils import *
@@ -25,6 +27,15 @@ from cloud_utils.cloud_utils import *
 from cloud_utils.cloud_selection import *
 from generic_utils.script_utils import *
 from hybrid_sims_utils.read_snap import *
+from constants import *
+
+import sys
+import os
+# Import get_scale_bar_size from fif_movies (same directory)
+_movies_dir = os.path.dirname(os.path.abspath(__file__))
+if _movies_dir not in sys.path:
+    sys.path.insert(0, _movies_dir)
+from fif_movies import get_scale_bar_size
 
 from docopt import docopt
 import multiprocessing
@@ -37,13 +48,45 @@ from matplotlib import colors
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import matplotlib.font_manager as fm
 import colorcet as cc
+import cmasher as cmr
 
 import os
 import numpy as np
 
 
-def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center, 
-                         image_box_size, save_path, resolution, vmin, vmax):
+def get_cmap(cmap_str, cmap_split=0.5):
+    """
+    Resolve a colormap name (or two comma-separated names) to a matplotlib colormap.
+    Supports matplotlib and cmasher colormaps. If two names are given, combines them.
+    """
+    def _resolve(name):
+        name = name.strip()
+        # Try cmasher first (registered as 'cmr.<name>' with matplotlib)
+        try:
+            return matplotlib.colormaps[f'cmr.{name}']
+        except KeyError:
+            pass
+        # Fall back to matplotlib (covers colorcet 'cet_*' etc.)
+        return matplotlib.colormaps[name]
+
+    names = [n.strip() for n in cmap_str.split(',')]
+    if len(names) == 1:
+        return _resolve(names[0])
+
+    # Combine two colormaps at the requested split fraction
+    cmap_a = _resolve(names[0])
+    cmap_b = _resolve(names[1])
+    n = 256
+    split = int(np.clip(cmap_split, 0, 1) * n)
+    colors_a = cmap_a(np.linspace(0, 1, split))
+    colors_b = cmap_b(np.linspace(0, 1, n - split))
+    combined_colors = np.vstack([colors_a, colors_b])
+    return matplotlib.colors.LinearSegmentedColormap.from_list(
+        f'{names[0]}_{names[1]}', combined_colors)
+
+
+def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
+                         image_box_size, save_path, resolution, vmin, vmax, cmap='cet_fire'):
     """
     Create a surface density plot for a single snapshot
     
@@ -96,9 +139,9 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
                                                size=image_box_size, res=resolution)
         
         # Plot surface density
-        p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2, 
-                          norm=colors.LogNorm(vmin=vmin, vmax=vmax), 
-                          cmap='cet_fire')
+        p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2,
+                          norm=colors.LogNorm(vmin=vmin, vmax=vmax),
+                          cmap=cmap)
         
         # Plot stars if available
         if star_data is not None and 'Coordinates' in star_data and len(star_data['Coordinates']) > 0:
@@ -124,15 +167,17 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
         plt.xticks([])
         plt.yticks([])
         
-        # Add scalebar
+        # Add scalebar — size chosen automatically by get_scale_bar_size (from fif_movies).
+        # image_box_size is in pc (code units); function expects kpc, returns kpc.
         fontprops = fm.FontProperties(size=18)
-        scale_bar_size = float(image_box_size / 4)
+        scale_bar_size_kpc, scale_bar_label = get_scale_bar_size(image_box_size * pc / kpc)
+        scale_bar_size = scale_bar_size_kpc * kpc / pc  # convert back to pc for plot coordinates
         scalebar = AnchoredSizeBar(ax.transData,
-                                    scale_bar_size, '%.1f pc'%(scale_bar_size), 'upper left',
+                                    scale_bar_size, scale_bar_label, 'upper left',
                                     pad=1,
                                     color='white',
                                     frameon=False,
-                                    size_vertical=scale_bar_size/10,
+                                    size_vertical=scale_bar_size/100,
                                     fontproperties=fontprops)
         ax.add_artist(scalebar)
         
@@ -155,11 +200,11 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
 
 def process_snapshot(args):
     """Process a single snapshot in parallel"""
-    snap_num, path, snapdir, save_path, image_box_size, resolution, vmin, vmax, center_on_stars = args
+    snap_num, path, snapdir, save_path, image_box_size, resolution, vmin, vmax, center_on_stars, cmap = args
     
     try:
         # Load snapshot data - path is the directory containing snapshots
-        pdata, star_data, fire_star_data, refine_data, snapname = get_snap_data_hybrid(
+        header, pdata, star_data, fire_star_data, refine_data, snapname = get_snap_data_hybrid(
             '', path, snap_num, snapshot_suffix='', snapdir=snapdir, refinement_tag=False)
         
         # Determine center
@@ -175,15 +220,15 @@ def process_snapshot(args):
             center = np.average(fire_star_coords, axis=0, weights=fire_star_masses)
         else:
             # Center on box center
-            box_size = pdata['BoxSize']
+            box_size = header['BoxSize']
             center = np.array([box_size / 2, box_size / 2, box_size / 2])
-        
+
         # Convert image_box_size from fraction to actual size
-        actual_box_size = pdata['BoxSize'] * image_box_size
+        actual_box_size = header['BoxSize'] * image_box_size
         
         # Create surface density plot
         plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
-                            actual_box_size, save_path, resolution, vmin, vmax)
+                            actual_box_size, save_path, resolution, vmin, vmax, cmap)
         
         print(f'Finished processing snapshot {snap_num}')
         
@@ -208,21 +253,31 @@ if __name__ == '__main__':
     vmin = float(args['--vmin'])
     vmax = float(args['--vmax'])
     center_on_stars = convert_to_bool(args['--center_on_stars'])
-    
+    cmap_split = float(args['--cmap_split'])
+    cmap = get_cmap(args['--cmap'], cmap_split)
+
+    # Support single snapshot (one integer) or a range (two integers)
+    if snapnum_range.size == 1:
+        snap_list = [int(snapnum_range[0])]
+        range_str = str(snap_list[0])
+    else:
+        snap_list = list(range(int(snapnum_range[0]), int(snapnum_range[1]) + 1))
+        range_str = f"{snapnum_range[0]} to {snapnum_range[1]}"
+
     print(f"Configuration:")
     print(f"  Snapshot path: {path}")
     print(f"  Save path: {save_path}")
-    print(f"  Snapshot range: {snapnum_range[0]} to {snapnum_range[1]}")
+    print(f"  Snapshot range: {range_str}")
     print(f"  Image box size: {image_box_size} (fraction of BoxSize)")
     print(f"  Resolution: {resolution}")
     print(f"  Colorbar range: {vmin} to {vmax}")
     print(f"  Center on stars: {center_on_stars}")
     print(f"  Parallel: {parallel} (cores: {num_cores})")
-    
+
     # Prepare arguments for each snapshot
-    snap_args = [(snap_num, path, snapdir, save_path, image_box_size, 
-                  resolution, vmin, vmax, center_on_stars) 
-                 for snap_num in range(snapnum_range[0], snapnum_range[1] + 1)]
+    snap_args = [(snap_num, path, snapdir, save_path, image_box_size,
+                  resolution, vmin, vmax, center_on_stars, cmap)
+                 for snap_num in snap_list]
     
     if parallel:
         print(f"\nProcessing {len(snap_args)} snapshots in parallel with {num_cores} cores...")
