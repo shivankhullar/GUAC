@@ -78,10 +78,8 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
         header[key] = F['Header'].attrs[key]
 
     pdata = {}
-    if ignore_data_type is not None:
-        if "gas" in ignore_data_type or 0 in ignore_data_type:
-        #print ("Ignoring gas data as specified in ignore_data_type")
-            pass
+    if ignore_data_type is not None and ("gas" in ignore_data_type or 0 in ignore_data_type):
+        pass  # gas explicitly ignored
     else:
         if custom_gas_fields is not None:
             for field in custom_gas_fields:
@@ -114,9 +112,8 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
 
     
     stardata = {}
-    if ignore_data_type is not None:
-        if "sinks" in ignore_data_type or 5 in ignore_data_type:
-            pass
+    if ignore_data_type is not None and ("sinks" in ignore_data_type or 5 in ignore_data_type):
+        pass  # sinks explicitly ignored
     else:
         if 'PartType5' in F.keys():
             try:
@@ -139,9 +136,8 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
                 print('No STARFORGE stars data in this snapshot')
 
     fire_stardata = {}
-    if ignore_data_type is not None:
-        if "stars" in ignore_data_type or 4 in ignore_data_type:
-            pass
+    if ignore_data_type is not None and ("stars" in ignore_data_type or 4 in ignore_data_type):
+        pass  # FIRE stars explicitly ignored
     else:
         if 'PartType4' in F.keys():
             try:
@@ -155,9 +151,8 @@ def get_snap_data_hybrid(sim, sim_path, snap, snapshot_suffix='', snapdir=True, 
 
 
     refine_data = {}
-    if ignore_data_type is not None:
-        if "refine" in ignore_data_type or 3 in ignore_data_type:
-            pass
+    if ignore_data_type is not None and ("refine" in ignore_data_type or 3 in ignore_data_type):
+        pass  # refinement particles explicitly ignored
     else:
         if 'PartType3' in F.keys():
             for field in "Masses", "Coordinates", "Velocities":
