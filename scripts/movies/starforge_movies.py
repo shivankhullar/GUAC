@@ -19,6 +19,7 @@ Options:
     --center_on_stars=<center_on_stars>                 Center on stars instead of box center [default: False]
     --cmap=<cmap>                                       Colormap name(s); comma-separate two to combine them [default: cet_fire]
     --cmap_split=<cmap_split>                           Fraction of first colormap when combining two (0-1) [default: 0.5]
+    --no_scale_bar                                      Do not add a scale bar to the images
 """
 
 from generic_utils.fire_utils import *
@@ -86,7 +87,7 @@ def get_cmap(cmap_str, cmap_split=0.5):
 
 
 def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
-                         image_box_size, save_path, resolution, vmin, vmax, cmap='cet_fire'):
+                         image_box_size, save_path, resolution, vmin, vmax, cmap='cet_fire', no_scale_bar=False):
     """
     Create a surface density plot for a single snapshot
     
@@ -169,17 +170,18 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
         
         # Add scalebar — size chosen automatically by get_scale_bar_size (from fif_movies).
         # image_box_size is in pc (code units); function expects kpc, returns kpc.
-        fontprops = fm.FontProperties(size=18)
-        scale_bar_size_kpc, scale_bar_label = get_scale_bar_size(image_box_size * pc / kpc)
-        scale_bar_size = scale_bar_size_kpc * kpc / pc  # convert back to pc for plot coordinates
-        scalebar = AnchoredSizeBar(ax.transData,
-                                    scale_bar_size, scale_bar_label, 'upper left',
-                                    pad=1,
-                                    color='white',
-                                    frameon=False,
-                                    size_vertical=scale_bar_size/100,
-                                    fontproperties=fontprops)
-        ax.add_artist(scalebar)
+        if not no_scale_bar:
+            fontprops = fm.FontProperties(size=18)
+            scale_bar_size_kpc, scale_bar_label = get_scale_bar_size(image_box_size * pc / kpc)
+            scale_bar_size = scale_bar_size_kpc * kpc / pc  # convert back to pc for plot coordinates
+            scalebar = AnchoredSizeBar(ax.transData,
+                                        scale_bar_size, scale_bar_label, 'upper left',
+                                        pad=1,
+                                        color='white',
+                                        frameon=False,
+                                        size_vertical=scale_bar_size/100,
+                                        fontproperties=fontprops)
+            ax.add_artist(scalebar)
         
         plt.tight_layout()
         
@@ -200,7 +202,7 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
 
 def process_snapshot(args):
     """Process a single snapshot in parallel"""
-    snap_num, path, snapdir, save_path, image_box_size, resolution, vmin, vmax, center_on_stars, cmap = args
+    snap_num, path, snapdir, save_path, image_box_size, resolution, vmin, vmax, center_on_stars, cmap, no_scale_bar = args
     
     try:
         # Load snapshot data - path is the directory containing snapshots
@@ -228,7 +230,7 @@ def process_snapshot(args):
         
         # Create surface density plot
         plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
-                            actual_box_size, save_path, resolution, vmin, vmax, cmap)
+                            actual_box_size, save_path, resolution, vmin, vmax, cmap, no_scale_bar)
         
         print(f'Finished processing snapshot {snap_num}')
         
@@ -255,6 +257,7 @@ if __name__ == '__main__':
     center_on_stars = convert_to_bool(args['--center_on_stars'])
     cmap_split = float(args['--cmap_split'])
     cmap = get_cmap(args['--cmap'], cmap_split)
+    no_scale_bar = args['--no_scale_bar']
 
     # Support single snapshot (one integer) or a range (two integers)
     if snapnum_range.size == 1:
@@ -276,7 +279,7 @@ if __name__ == '__main__':
 
     # Prepare arguments for each snapshot
     snap_args = [(snap_num, path, snapdir, save_path, image_box_size,
-                  resolution, vmin, vmax, center_on_stars, cmap)
+                  resolution, vmin, vmax, center_on_stars, cmap, no_scale_bar)
                  for snap_num in snap_list]
     
     if parallel:
