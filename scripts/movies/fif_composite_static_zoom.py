@@ -24,6 +24,7 @@ from meshoid import GridSurfaceDensity
 import glob
 import re
 import os
+import argparse
 from tqdm import tqdm
 import pickle
 import itertools
@@ -423,13 +424,14 @@ def load_and_interpolate_colorbar_ranges(save_path, num_frames):
 
 
 
-save_path = "/mnt/home/skhullar/projects/SFIRE/m12f/jeans_refinement_movie/"
+save_path = "/mnt/home/skhullar/projects/SFIRE/m12f/movies/new_jeans_refinement_500/"
 
 
 path = "/mnt/home/skhullar/ceph/projects/SFIRE/m12f/"
-sim = "output_jeans_refinement"
+#sim = "output_jeans_refinement"
+sim = "output_new_jeans_refinement"
 snapshot_suffix = ""
-snap_num = 32
+snap_num = 250 #32
 snapdir=False
 #refinement_tag=True
 refinement_tag=False
@@ -438,12 +440,12 @@ movie_tag=True
 
 print ("Loading data...")
 
-pdata, stardata, fire_stardata, refine_data, snapname = get_snap_data_hybrid(
+header, pdata, stardata, fire_stardata, refine_data, snapname = get_snap_data_hybrid(
         sim, path, snap_num, snapshot_suffix=snapshot_suffix, snapdir=snapdir, refinement_tag=refinement_tag, full_tag=full_tag, movie_tag=movie_tag)
 
 print ("Loaded data...")
 
-pdata, stardata, fire_stardata = convert_units_to_physical(pdata, stardata, fire_stardata)
+header, pdata, stardata, fire_stardata = convert_units_to_physical(header, pdata, stardata, fire_stardata)
 
 
 
@@ -483,7 +485,11 @@ angle_degs = np.append(np.linspace(90,360,300), np.append(np.linspace(0,90,100),
 # Mode settings
 # 'collect': First pass - collect colorbar ranges and save to file
 # 'plot': Second pass - load ranges, interpolate, and create images with smooth colorbars
-MODE = 'plot'  # Change to 'plot' for second pass, 'collect' for first pass
+parser = argparse.ArgumentParser()
+parser.add_argument('--mode', type=str, choices=['collect', 'plot'], default='plot',
+                    help="'collect' to gather colorbar ranges, 'plot' to create images")
+_args = parser.parse_args()
+MODE = _args.mode
 
 # Parallelization settings
 parallelize = True
