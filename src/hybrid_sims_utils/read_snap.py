@@ -212,7 +212,7 @@ def convert_units_to_physical(header, pdata, stardata, fire_stardata):
     data_dicts = [header, pdata, stardata, fire_stardata]
     for data_dict in data_dicts: 
         for key in data_dict.keys():
-            if key == "Coordinates" or key == "SmoothingLength":
+            if key == "Coordinates" or key == "SmoothingLength" or key == "KernelMaxRadius":
                 data_dict[key] = data_dict[key] * rconv
             elif key == "RefinementRegionCenter":
                 data_dict[key] = data_dict[key] * rconv
@@ -266,7 +266,7 @@ def convert_quant_to_physical(array, key=None, a=None, h=None):
         print ("Using default value h=0.702")
     hinv = 1.0 / h
     rconv = a * hinv 
-    if key == "Coordinates" or key == "SmoothingLength":
+    if key == "Coordinates" or key == "SmoothingLength" or key == "KernelMaxRadius":
         physical_array = array * rconv
     elif key == "RefinementRegionCenter":
         physical_array = array * rconv
@@ -324,7 +324,7 @@ def convert_quant_from_physical(array, key=None, a=None, h=None):
     hinv = 1.0 / h
     rconv = a * hinv
     rconv_inv = 1.0 / rconv 
-    if key == "Coordinates" or key == "SmoothingLength":
+    if key == "Coordinates" or key == "SmoothingLength" or key == "KernelMaxRadius":
         physical_array = array * rconv_inv
     elif key == "RefinementRegionCenter":
         physical_array = array * rconv_inv
