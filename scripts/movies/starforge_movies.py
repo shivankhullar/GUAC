@@ -117,7 +117,10 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
         # Extract gas particle data
         pos = pdata["Coordinates"]
         mass = pdata["Masses"]
-        hsml = pdata["SmoothingLength"]
+        try:
+            hsml = pdata["SmoothingLength"]
+        except:
+            hsml = pdata["KernelMaxRadius"]
         
         # Create Meshoid object
         M = Meshoid(pos, mass, hsml)
@@ -206,8 +209,9 @@ def process_snapshot(args):
     
     try:
         # Load snapshot data - path is the directory containing snapshots
+        custom_gas_fields = ['Coordinates', 'Masses', 'SmoothingLength', 'KernelMaxRadius']
         header, pdata, star_data, fire_star_data, refine_data, snapname = get_snap_data_hybrid(
-            '', path, snap_num, snapshot_suffix='', snapdir=snapdir, refinement_tag=False)
+            '', path, snap_num, snapshot_suffix='', snapdir=snapdir, refinement_tag=False, custom_gas_fields=custom_gas_fields)
         
         # Determine center
         if center_on_stars and star_data is not None and 'Coordinates' in star_data and len(star_data['Coordinates']) > 0:
