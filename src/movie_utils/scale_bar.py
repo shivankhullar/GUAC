@@ -22,7 +22,7 @@ def get_scale_bar_size(image_box_size):
     scale_bar_label : str
         Label for the scale bar (e.g. "10 pc", "1 kpc", etc.)
     """
-    scale_bar_sizes_kpc = np.array([30, 20, 15, 10, 8, 5, 2, 1])
+    scale_bar_sizes_kpc = np.array([3000, 1000, 500, 300, 100, 50, 30, 20, 15, 10, 8, 5, 2, 1])
     compare_box_size_max = scale_bar_sizes_kpc*5
     compare_box_size_min = scale_bar_sizes_kpc*4
 
@@ -34,10 +34,12 @@ def get_scale_bar_size(image_box_size):
                 #print (f"Image box size {image_box_size} in range for scale bar size {scale_bar_sizes_kpc[i]}")
                 scale_bar_value = scale_bar_sizes_kpc[i]
                 break
-            if image_box_size <= compare_box_size_min[i] and image_box_size > compare_box_size_max[i+1]:
+            elif image_box_size <= compare_box_size_min[i] and image_box_size > compare_box_size_max[i+1]:
                 #print (f"Image box size {image_box_size} less than range for scale bar size {scale_bar_sizes_kpc[i]}")
                 scale_bar_value = scale_bar_sizes_kpc[i]
-                break        
+                break
+            else:
+                scale_bar_value = scale_bar_sizes_kpc[0]
 
         print (f"Selected scale bar size: {scale_bar_value} kpc for image box size: {image_box_size} kpc")
 
@@ -107,7 +109,12 @@ def get_scale_bar_size(image_box_size):
     elif multiplier == "au":
         return scale_bar_value * AU / kpc, f"{int(scale_bar_value)} AU"
     elif multiplier == "kpc":
-        return scale_bar_value, f"{int(scale_bar_value)} kpc"
+        if scale_bar_value >= 1000:
+            mpc_value = scale_bar_value / 1000
+            label = f"{int(mpc_value)} Mpc" if mpc_value == int(mpc_value) else f"{mpc_value:.1f} Mpc"
+        else:
+            label = f"{int(scale_bar_value)} kpc"
+        return scale_bar_value, label
     else:
         return None
 
