@@ -14,7 +14,8 @@ Options:
     --box_size=<box_size>       Box size [default: 1.0]
     --vel=<vel>                 Velocity of gas particles [default: 0.0]
     --T=<T>                     Temperature of gas particles [default: 20.0]
-    --glass_path=<glass_path>   Path to glass file [default: ./glass_orig.npy]
+    --glass_path=<glass_path>   Path to glass file (only used with --glass_file) [default: ./glass_orig.npy]
+    --glass_file                Load and tessellate coordinates from a glass file instead of generating on the fly [default: False]
     --file_name=<file_name>     Name of output file [default: glass_cube.hdf5]
     --out_path=<out_path>       Path to output file [default: ./]
 """
@@ -67,26 +68,24 @@ def get_cube_particles(x, N_gas, L, a):
 
 
 
-def get_gas_props(M_gas, N_gas, box_size, vel, T, glass_path):
+def get_gas_props(M_gas, N_gas, box_size, vel, T, glass_path=None, use_glass_file=False):
     dm = M_gas/N_gas
     mgas = np.repeat(dm, N_gas)
 
-    x = get_glass_coords(N_gas, glass_path)
-    Nx = len(x)
-    #x = 2*(x-0.5)
-    #print (x, len(x), x[:,0].max(), x[:,0].min(), x[:,1].max(), x[:,1].min(), x[:,2].max(), x[:,2].min())
-
-    print("Computing radii...")
-    r = cdist(x, [np.zeros(3)])[:,0]
-
-    print("Done! Sorting coordinates...")
-    x = x[r.argsort()]
-
-    L = max(x[:,0].max(), x[:,1].max(), x[:,2].max())
-    a = (N_gas/len(x))**(1/3)*L
-        
-    cut_x = get_cube_particles(x, N_gas, L, a)
-    cut_x = cut_x*L/a*box_size
+    if use_glass_file:
+        x = get_glass_coords(N_gas, glass_path)
+        print("Computing radii...")
+        r = cdist(x, [np.zeros(3)])[:,0]
+        print("Done! Sorting coordinates...")
+        x = x[r.argsort()]
+        L = max(x[:,0].max(), x[:,1].max(), x[:,2].max())
+        a = (N_gas/len(x))**(1/3)*L
+        cut_x = get_cube_particles(x, N_gas, L, a)
+        cut_x = cut_x*L/a*box_size
+    else:
+        from meshoid import particle_glass
+        print(f"Generating glass with {N_gas} particles via meshoid...")
+        cut_x = particle_glass(N_gas, L=box_size)
 
     vel = 0.0
     vels = np.ones((N_gas, 3))*vel
@@ -162,6 +161,7 @@ if __name__ == "__main__":
     vel = float(args['--vel'])
     T = float(args['--T'])
     glass_path = args['--glass_path']
+    use_glass_file = args['--glass_file']
     file_name = args['--file_name']
     out_path = args['--out_path']
     #repo_dir = args['--repo_dir']
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     #filename = 'glass_cube.hdf5'
     #out_path = './'
     file = out_path+file_name
-    gas_props = get_gas_props(M_gas, N_gas, box_size, vel, T, glass_path=glass_path)
+    gas_props = get_gas_props(M_gas, N_gas, box_size, vel, T, glass_path=glass_path, use_glass_file=use_glass_file)
     refine_props = get_refine_props(box_size, refine_mass=1e-3)
     write_to_file(file, gas_props, refine_props)
 

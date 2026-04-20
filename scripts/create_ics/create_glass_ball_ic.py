@@ -17,7 +17,8 @@ Options:
 
     --vel=<vel>                 Velocity of gas particles [default: 0.0]
     --T=<T>                     Temperature of gas particles [default: 20.0]
-    --glass_path=<glass_path>   Path to glass file [default: ./glass_orig.npy]
+    --glass_path=<glass_path>   Path to glass file (only used with --glass_file) [default: ./glass_orig.npy]
+    --glass_file                Load and tessellate coordinates from a glass file instead of generating on the fly [default: False]
     --file_name=<file_name>     Name of output file [default: glass_ball.hdf5]
     --file_params=<file_params>   Name of parameter file [default: ./params.txt]
     --out_path=<out_path>       Path to output file [default: ./]
@@ -104,6 +105,8 @@ t_unit = length_unit / v_unit
 G = 4300.71 * v_unit**-2 * mass_unit / length_unit
 makebox = arguments["--makebox"]
 
+
+glass_file = arguments["--glass_file"]
 
 if arguments["--glass_path"]:
     glass_path = arguments["--glass_path"]
@@ -207,17 +210,28 @@ if param_only:
 dm = M_gas / N_gas
 mgas = np.repeat(dm, N_gas)
 
-x = get_glass_coords(N_gas, glass_path)
-Nx = len(x)
-x = 2 * (x - 0.5)
-print("Computing radii...")
-r = cdist(x, [np.zeros(3)])[:, 0]
-print("Done! Sorting coordinates...")
-x = x[r.argsort()][:N_gas]
-print("Done! Rescaling...")
-x *= (float(Nx) / N_gas * 4 * np.pi / 3 / 8) ** (1.0 / 3) * R
-print("Done! Recomupting radii...")
-r = cdist(x, [np.zeros(3)])[:, 0]
+if glass_file:
+    x = get_glass_coords(N_gas, glass_path)
+    Nx = len(x)
+    x = 2 * (x - 0.5)
+    print("Computing radii...")
+    r = cdist(x, [np.zeros(3)])[:, 0]
+    print("Done! Sorting coordinates...")
+    x = x[r.argsort()][:N_gas]
+    print("Done! Rescaling...")
+    x *= (float(Nx) / N_gas * 4 * np.pi / 3 / 8) ** (1.0 / 3) * R
+    print("Done! Recomputing radii...")
+    r = cdist(x, [np.zeros(3)])[:, 0]
+else:
+    from meshoid import particle_glass
+    N_box = int(N_gas * 8 / (4 * np.pi / 3)) + 1
+    print(f"Generating glass with {N_box} particles in box via meshoid...")
+    x = particle_glass(N_box, L=1.0) - 0.5  # center at origin in [-0.5, 0.5]^3
+    print("Done! Computing radii...")
+    r = cdist(x, [np.zeros(3)])[:, 0]
+    print("Done! Sorting and selecting...")
+    order = r.argsort()
+    x, r = x[order][:N_gas], r[order][:N_gas]
 x, r = x / r.max(), r / r.max()
 print("Doing density profile...")
 rnew = r ** (3.0 / (3 + density_exponent)) * R
@@ -292,9 +306,13 @@ if diffuse_gas:
     ) * rho_warm  # mass of diffuse box-filling medium
     N_warm = int(M_warm / (M_gas / N_gas))
     if derefinement:
-        x0 = get_glass_coords(N_gas, glass_path)
-        Nx = len(x0)
-        x0 = 2 * (x0 - 0.5)
+        if glass_file:
+            x0 = get_glass_coords(N_gas, glass_path)
+            x0 = 2 * (x0 - 0.5)
+        else:
+            N_box0 = int(N_gas * 8 / (4 * np.pi / 3)) + 1
+            print(f"Generating ambient glass with {N_box0} particles via meshoid...")
+            x0 = particle_glass(N_box0, L=1.0) - 0.5
         r0 = (x0 * x0).sum(1) ** 0.5
         x0, r0 = x0[r0.argsort()], r0[r0.argsort()]
         # first lay down the stuff within 3*R
