@@ -14,12 +14,14 @@ Options:
     --parallel=<parallel>                               Should the script execute in parallel? [default: True]
     --num_cores=<num_cores>                             Number of processors to run on [default: 8]
     --resolution=<resolution>                           Resolution of surface density map [default: 1000]
-    --vmin=<vmin>                                       Minimum value for colorbar [default: 1]
-    --vmax=<vmax>                                       Maximum value for colorbar [default: 2000]
+    --vmin=<vmin>                                       Minimum value for colorbar; overrides auto range [default: None]
+    --vmax=<vmax>                                       Maximum value for colorbar; overrides auto range [default: None]
+    --cbar_range_auto=<cbar_range_auto>                 Auto-set colorbar range from data min/max [default: True]
     --center_on_stars=<center_on_stars>                 Center on stars instead of box center [default: False]
     --cmap=<cmap>                                       Colormap name(s); comma-separate two to combine them [default: cet_fire]
     --cmap_split=<cmap_split>                           Fraction of first colormap when combining two (0-1) [default: 0.5]
     --no_scale_bar                                      Do not add a scale bar to the images
+    --colorbar=<colorbar>                               Add a colorbar on the right side of the plot [default: False]
 """
 
 from generic_utils.fire_utils import *
@@ -46,6 +48,7 @@ import matplotlib.pyplot as plt
 matplotlib.use('Agg')
 from matplotlib.colors import LogNorm
 from matplotlib import colors
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 import matplotlib.font_manager as fm
 import colorcet as cc
@@ -87,7 +90,7 @@ def get_cmap(cmap_str, cmap_split=0.5):
 
 
 def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
-                         image_box_size, save_path, resolution, vmin, vmax, cmap='cet_fire', no_scale_bar=False):
+                         image_box_size, save_path, resolution, vmin, vmax, cmap='cet_fire', no_scale_bar=False, cbar_range_auto=True, colorbar=False, verbose=False):
     """
     Create a surface density plot for a single snapshot
     
@@ -141,7 +144,15 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
         # Calculate surface density
         sigma_gas_msun_pc2 = M.SurfaceDensity(M.m, center=center,
                                                size=image_box_size, res=resolution)
-        
+
+        if cbar_range_auto:
+            positive = sigma_gas_msun_pc2[sigma_gas_msun_pc2 > 0]
+            vmin = float(positive.min()) if positive.size > 0 else 1e-3
+            vmax = float(sigma_gas_msun_pc2.max())
+
+        if verbose:
+            print(f"  Snap {snap_num}: vmin={vmin:.4g}, vmax={vmax:.4g} [M_sun/pc^2]")
+
         # Plot surface density
         p = ax.pcolormesh(X, Y, sigma_gas_msun_pc2,
                           norm=colors.LogNorm(vmin=vmin, vmax=vmax),
@@ -186,14 +197,26 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
                                         fontproperties=fontprops)
             ax.add_artist(scalebar)
         
+        if colorbar:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0)
+            cax.set_facecolor('black')
+            cbar = fig.colorbar(p, cax=cax)
+            cbar.ax.tick_params(which='major', colors='white', labelsize=14)
+            cbar.ax.tick_params(which='minor', colors='white', length=3)
+            cbar.ax.yaxis.set_minor_locator(matplotlib.ticker.LogLocator(subs='all'))
+            cbar.outline.set_edgecolor('white')
+            cbar.set_label(r'$\Sigma_\mathrm{gas}$ [M$_\odot$ pc$^{-2}$]', color='white', fontsize=16)
+
         plt.tight_layout()
-        
+
         # Save figure
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         
         snap_name = f'snapshot_{snap_num:04d}.png'
-        plt.savefig(os.path.join(save_path, snap_name), dpi=300, facecolor='black')
+        plt.savefig(os.path.join(save_path, snap_name), dpi=300, facecolor='black',
+                    bbox_inches='tight', pad_inches=0)
         print(f"Saved: {os.path.join(save_path, snap_name)}")
         plt.close()
         
@@ -205,7 +228,7 @@ def plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
 
 def process_snapshot(args):
     """Process a single snapshot in parallel"""
-    snap_num, path, snapdir, save_path, image_box_size, resolution, vmin, vmax, center_on_stars, cmap, no_scale_bar = args
+    snap_num, path, snapdir, save_path, image_box_size, resolution, vmin, vmax, center_on_stars, cmap, no_scale_bar, cbar_range_auto, colorbar, verbose = args
     
     try:
         # Load snapshot data - path is the directory containing snapshots
@@ -234,7 +257,7 @@ def process_snapshot(args):
         
         # Create surface density plot
         plot_surface_density(pdata, star_data, fire_star_data, snap_num, center,
-                            actual_box_size, save_path, resolution, vmin, vmax, cmap, no_scale_bar)
+                            actual_box_size, save_path, resolution, vmin, vmax, cmap, no_scale_bar, cbar_range_auto, colorbar, verbose)
         
         print(f'Finished processing snapshot {snap_num}')
         
@@ -256,12 +279,27 @@ if __name__ == '__main__':
     image_box_size = float(args['--image_box_size'])
     snapnum_range = convert_to_array(args['--snapnum_range'], dtype=np.int32)
     resolution = int(args['--resolution'])
-    vmin = float(args['--vmin'])
-    vmax = float(args['--vmax'])
+    vmin_arg = args['--vmin']
+    vmax_arg = args['--vmax']
+    cbar_range_auto = convert_to_bool(args['--cbar_range_auto'])
+
+    vmin_arg = None if vmin_arg in (None, 'None') else vmin_arg
+    vmax_arg = None if vmax_arg in (None, 'None') else vmax_arg
+
+    # If the user explicitly provides vmin or vmax, disable auto range and use those values
+    if vmin_arg is not None or vmax_arg is not None:
+        cbar_range_auto = False
+        vmin = float(vmin_arg) if vmin_arg is not None else 1.0
+        vmax = float(vmax_arg) if vmax_arg is not None else 2000.0
+    else:
+        vmin = 1.0
+        vmax = 2000.0
+
     center_on_stars = convert_to_bool(args['--center_on_stars'])
     cmap_split = float(args['--cmap_split'])
     cmap = get_cmap(args['--cmap'], cmap_split)
     no_scale_bar = args['--no_scale_bar']
+    colorbar = convert_to_bool(args['--colorbar'])
 
     # Support single snapshot (one integer) or a range (two integers)
     if snapnum_range.size == 1:
@@ -277,13 +315,15 @@ if __name__ == '__main__':
     print(f"  Snapshot range: {range_str}")
     print(f"  Image box size: {image_box_size} (fraction of BoxSize)")
     print(f"  Resolution: {resolution}")
-    print(f"  Colorbar range: {vmin} to {vmax}")
+    print(f"  Colorbar range: {'auto' if cbar_range_auto else f'{vmin} to {vmax}'}")
     print(f"  Center on stars: {center_on_stars}")
+    print(f"  Colorbar: {colorbar}")
     print(f"  Parallel: {parallel} (cores: {num_cores})")
 
     # Prepare arguments for each snapshot
+    verbose = len(snap_list) == 1
     snap_args = [(snap_num, path, snapdir, save_path, image_box_size,
-                  resolution, vmin, vmax, center_on_stars, cmap, no_scale_bar)
+                  resolution, vmin, vmax, center_on_stars, cmap, no_scale_bar, cbar_range_auto, colorbar, verbose)
                  for snap_num in snap_list]
     
     if parallel:
