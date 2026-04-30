@@ -379,7 +379,7 @@ def convert_scale_factor_to_time(a, pdata):
     return time_myr
 
 
-def convert_formation_times_to_ages(pdata, fire_stardata):
+def convert_formation_times_to_ages(fire_stardata, header):
     """
     INCOMPLETE:
     Convert stellar formation times to ages using cosmology.
@@ -403,17 +403,27 @@ def convert_formation_times_to_ages(pdata, fire_stardata):
     -----
     This function is incomplete and requires omega_radiation to be defined.
     """
-    omega_matter = pdata['Omega_Matter']
-    omega_lambda = pdata['Omega_Lambda']
-    if pdata['Omega_Radiation'] is not None:
-        omega_radiation = pdata['Omega_Radiation']
+    omega_matter = header['Omega_Matter']
+    omega_lambda = header['Omega_Lambda']
+    if header['Omega_Radiation'] is not None:
+        omega_radiation = header['Omega_Radiation']
     else:
         print ("Omega_Radiation not found in particle data, using default value of 0.0")
         omega_radiation = 0.0
-    hubble_constant = pdata['HubbleParam']
+    hubble_constant = header['HubbleParam']
+    scale_factor = header["Time"]
     sfts = fire_stardata['StellarFormationTime']
 
 
     co = yt.utilities.cosmology.Cosmology(omega_matter=omega_matter, omega_lambda=omega_lambda, hubble_constant=hubble_constant, omega_radiation=omega_radiation)
-    time_sec = float(co.t_from_a(a))
+    time_sec = float(co.t_from_a(scale_factor))
     age_myr = time_sec / Myr
+    sfts_time_myr = co.t_from_a(sfts).value / Myr
+    if header["Time_Myr"] is not None:
+        #print ("Header time in Myr already exists, using that to compute ages")
+        fire_stardata["StellarAges_Myr"] = header["Time_Myr"] - sfts_time_myr
+    else:
+        header["Time_Myr"] = convert_scale_factor_to_time(header["Time"], header)
+        fire_stardata["StellarAges_Myr"] = header["Time_Myr"] - sfts_time_myr
+
+    return fire_stardata
