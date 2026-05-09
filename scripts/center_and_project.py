@@ -19,6 +19,7 @@ from galaxy_utils.gal_utils import *
 from generic_utils.fire_utils import *
 from generic_utils.script_utils import *
 import glob
+import h5py
 #from gal_viz_utils import *
 from meshoid import Meshoid
 import matplotlib
@@ -30,6 +31,22 @@ import os
 from multiprocessing import Pool
 from functools import partial
 
+
+
+def has_dm_coordinates(path, snap, ptype=1):
+    """Return True if the snapshot HDF5 file contains PartType{ptype}/Coordinates."""
+    patterns = [
+        os.path.join(path, f'snapshot_{snap:03d}.hdf5'),
+        os.path.join(path, f'snapdir_{snap:03d}', f'snapshot_{snap:03d}.0.hdf5'),
+    ]
+    for fname in patterns:
+        if os.path.exists(fname):
+            try:
+                with h5py.File(fname, 'r') as f:
+                    return f'PartType{ptype}/Coordinates' in f
+            except Exception:
+                return False
+    return False
 
 
 def make_photo(path, snapnum, save_path):
@@ -45,6 +62,9 @@ def make_photo(path, snapnum, save_path):
 
 def process_snapshot(snap, path, save_path):
     """Wrapper function for parallel processing"""
+    if not has_dm_coordinates(path, snap):
+        print(f"Skipping snapshot {snap}: PartType1/Coordinates not found")
+        return snap, False
     try:
         print("==============================================================")
         print("Processing snapshot: ", snap)
