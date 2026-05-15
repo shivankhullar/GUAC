@@ -1,120 +1,77 @@
 """
-This file contains some utility functions for getting scale bar sizes.
+Scale bar utility for movie frames.
 
 Author: Shivan Khullar
 Date: March 2026
 """
 
 import numpy as np
-from generic_utils.constants import *
+from generic_utils.constants import *   # kpc, pc, AU (CGS cm values)
 
 
-def get_scale_bar_size(image_box_size):
-    """
+# 1 pc in kpc  = pc/kpc (exact)
+# 1 AU in kpc  = AU/kpc (exact, using CGS constants)
+_PC_IN_KPC = pc / kpc      # ≈ 1e-3
+_AU_IN_KPC = AU / kpc      # ≈ 4.848e-9
+
+
+def get_scale_bar_size(image_box_size_kpc):
+    """Return (scale_bar_size_kpc, label) for a given image box size in kpc.
+
+    Picks the largest "nice" size that is <= image_box_size / 5, so the bar
+    occupies roughly 1/5 of the image width.  Works from Mpc scales down to
+    single-AU scales without relying on exception-based tier cascades.
+
     Parameters
     ----------
-    image_box_size : float
-        Size of the image box in kpc.
+    image_box_size_kpc : float
+        Full width of the rendered image box, in kpc.
+
     Returns
     -------
-    scale_bar_size : float
-        Size of the scale bar in kpc.
-    scale_bar_label : str
-        Label for the scale bar (e.g. "10 pc", "1 kpc", etc.)
+    scale_bar_size_kpc : float
+    label : str   e.g. "100 pc", "1 kpc", "500 AU"
     """
-    scale_bar_sizes_kpc = np.array([3000, 1000, 500, 300, 100, 50, 30, 20, 15, 10, 8, 5, 2, 1])
-    compare_box_size_max = scale_bar_sizes_kpc*5
-    compare_box_size_min = scale_bar_sizes_kpc*4
+    target_kpc = image_box_size_kpc / 5.0
 
-    try:
-        multiplier = "kpc"
-        for i in range(len(scale_bar_sizes_kpc)):
-            #print (f"Comparing image box size {image_box_size} to range {compare_box_size_min[i]} to {compare_box_size_max[i]}")
-            if image_box_size <= compare_box_size_max[i] and image_box_size >= compare_box_size_min[i]:
-                #print (f"Image box size {image_box_size} in range for scale bar size {scale_bar_sizes_kpc[i]}")
-                scale_bar_value = scale_bar_sizes_kpc[i]
-                break
-            elif image_box_size <= compare_box_size_min[i] and image_box_size > compare_box_size_max[i+1]:
-                #print (f"Image box size {image_box_size} less than range for scale bar size {scale_bar_sizes_kpc[i]}")
-                scale_bar_value = scale_bar_sizes_kpc[i]
-                break
-            else:
-                scale_bar_value = scale_bar_sizes_kpc[0]
+    # Build candidate list (large → small) as (size_in_kpc, label_string).
+    # Every tier is represented, so there are no gaps.
+    candidates = []
 
-        print (f"Selected scale bar size: {scale_bar_value} kpc for image box size: {image_box_size} kpc")
-
-    except:
-        multiplier = "pc"
-        try:
-            scale_bar_sizes_pc = np.array([500, 300, 200, 100, 75, 50, 25, 20, 15, 10, 5, 2, 1, 0.5, 0.2, 0.1])
-            compare_box_size_max = scale_bar_sizes_pc*5
-            compare_box_size_min = scale_bar_sizes_pc*4
-
-            #image_box_sizes = np.linspace(100, 4, 10)
-            image_box_size = image_box_size*kpc/pc
-            for i in range(len(scale_bar_sizes_pc)):
-                #print (f"Comparing image box size {image_box_size} to range {compare_box_size_min[i]} to {compare_box_size_max[i]}")
-                if image_box_size <= compare_box_size_max[i] and image_box_size >= compare_box_size_min[i]:
-                    #print (f"Image box size {image_box_size} in range for scale bar size {scale_bar_sizes_pc[i]}")
-                    scale_bar_value = scale_bar_sizes_pc[i]
-                    break
-                elif image_box_size <= compare_box_size_min[i] and image_box_size > compare_box_size_max[i+1]:
-                    #print (f"Image box size {image_box_size} less than range for scale bar size {scale_bar_sizes_pc[i]}")
-                    scale_bar_value = scale_bar_sizes_pc[i]
-                    break        
-                else:
-                    scale_bar_value = scale_bar_sizes_pc[0]
-                    #print (f"Image box size {image_box_size} not in range for scale bar size {scale_bar_sizes_pc[i]}")
-                #    scale_bar_value = scale_bar_sizes_pc[i]
-                    #break
-
-            print (f"Selected scale bar size: {scale_bar_value} pc for image box size: {image_box_size} pc")
-        except:
-            multiplier = "au"
-            try:
-                scale_bar_sizes_au = np.array([10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1])
-                compare_box_size_max = scale_bar_sizes_au*5
-                compare_box_size_min = scale_bar_sizes_au*4
-
-                #image_box_sizes = np.linspace(100, 4, 10)
-                
-                image_box_size = image_box_size*pc/AU
-                for i in range(len(scale_bar_sizes_au)):
-                    #print (f"Comparing image box size {image_box_size} to range {compare_box_size_min[i]} to {compare_box_size_max[i]}")
-                    if image_box_size <= compare_box_size_max[i] and image_box_size >= compare_box_size_min[i]:
-                        #print (f"Image box size {image_box_size} in range for scale bar size {scale_bar_sizes_au[i]}")
-                        scale_bar_value = scale_bar_sizes_au[i]
-                        break
-                    elif image_box_size <= compare_box_size_min[i] and image_box_size > compare_box_size_max[i+1]:
-                        #print (f"Image box size {image_box_size} less than range for scale bar size {scale_bar_sizes_au[i]}")
-                        scale_bar_value = scale_bar_sizes_au[i]
-                        break        
-                    else:
-                        scale_bar_value = scale_bar_sizes_au[0]
-                        #print (f"Image box size {image_box_size} not in range for scale bar size {scale_bar_sizes_au[i]}")
-                    #    scale_bar_value = scale_bar_sizes_au[i]
-                        #break
-
-                print (f"Selected scale bar size: {scale_bar_value} au for image box size: {image_box_size} au")
-            except:
-                scale_bar_value = scale_bar_sizes_au[-1]
-                print (f"Could not determine scale bar size automatically, using previous value of {scale_bar_value} AU.")        
-                #scale_bar_value
-
-    if multiplier == "pc":
-        if scale_bar_value < 1:
-            return scale_bar_value * pc / kpc, f"{scale_bar_value:.1f} pc"
+    # kpc / Mpc tier
+    for v in [3000, 1000, 500, 300, 100, 50, 30, 20, 15, 10, 8, 5, 3, 2, 1]:
+        if v >= 1000:
+            label = f"{v // 1000} Mpc"
         else:
-            return scale_bar_value * pc / kpc, f"{int(scale_bar_value)} pc"
-    elif multiplier == "au":
-        return scale_bar_value * AU / kpc, f"{int(scale_bar_value)} AU"
-    elif multiplier == "kpc":
-        if scale_bar_value >= 1000:
-            mpc_value = scale_bar_value / 1000
-            label = f"{int(mpc_value)} Mpc" if mpc_value == int(mpc_value) else f"{mpc_value:.1f} Mpc"
-        else:
-            label = f"{int(scale_bar_value)} kpc"
-        return scale_bar_value, label
-    else:
-        return None
+            label = f"{v} kpc"
+        candidates.append((float(v), label))
 
+    # pc tier (converted to kpc)
+    for v in [500, 300, 200, 100, 75, 50, 25, 20, 15, 10, 5, 2, 1,
+              0.5, 0.2, 0.1, 0.05, 0.02, 0.01]:
+        v_kpc = v * _PC_IN_KPC
+        label = f"{v:.2f} pc".rstrip('0').rstrip('.') + " pc" if v < 1 else f"{int(v) if v == int(v) else v} pc"
+        # simpler label building:
+        if v >= 1:
+            label = f"{int(v)} pc"
+        else:
+            # remove trailing zeros: 0.50 → "0.5 pc", 0.10 → "0.1 pc"
+            label = f"{v:.2f}".rstrip('0').rstrip('.') + " pc"
+        candidates.append((v_kpc, label))
+
+    # AU tier (converted to kpc)
+    for v in [10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1]:
+        v_kpc = v * _AU_IN_KPC
+        candidates.append((v_kpc, f"{v} AU"))
+
+    # Pick the largest candidate that fits within target_kpc
+    for size_kpc, label in candidates:
+        if size_kpc <= target_kpc:
+            print(f"Scale bar: {label}  (box={image_box_size_kpc:.3e} kpc, "
+                  f"target={target_kpc:.3e} kpc, bar={size_kpc:.3e} kpc)")
+            return size_kpc, label
+
+    # Fallback: smallest candidate (single AU)
+    size_kpc, label = candidates[-1]
+    print(f"Scale bar fallback: {label}  (box={image_box_size_kpc:.3e} kpc)")
+    return size_kpc, label
