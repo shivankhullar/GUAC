@@ -346,7 +346,7 @@ def convert_quant_from_physical(array, key=None, a=None, h=None):
     return physical_array
 
 
-def convert_scale_factor_to_time(a, pdata):
+def convert_scale_factor_to_time(a, header):
     """
     Convert scale factor to time in Myr using cosmology.
 
@@ -354,7 +354,7 @@ def convert_scale_factor_to_time(a, pdata):
     ----------
     a : float
         Scale factor to convert.
-    pdata : dict
+    header : dict
         Dictionary containing cosmological parameters 'Omega_Matter', 'Omega_Lambda', and 'HubbleParam'.
 
     Returns
@@ -362,14 +362,14 @@ def convert_scale_factor_to_time(a, pdata):
     age_myr : float
         Age of the universe at the given scale factor in Myr.
     """
-    omega_matter = pdata['Omega_Matter']
-    omega_lambda = pdata['Omega_Lambda']
-    if pdata['Omega_Radiation'] is not None:
-        omega_radiation = pdata['Omega_Radiation']
+    omega_matter = header['Omega_Matter']
+    omega_lambda = header['Omega_Lambda']
+    if header['Omega_Radiation'] is not None:
+        omega_radiation = header['Omega_Radiation']
     else:
         print ("Omega_Radiation not found in particle data, using default value of 0.0")
         omega_radiation = 0.0
-    hubble_constant = pdata['HubbleParam']
+    hubble_constant = header['HubbleParam']
 
     co = yt.utilities.cosmology.Cosmology(omega_matter=omega_matter, omega_lambda=omega_lambda, hubble_constant=hubble_constant, omega_radiation=omega_radiation)
     
