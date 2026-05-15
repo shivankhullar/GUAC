@@ -8,6 +8,7 @@ Date: Feb 2025
 """
 import h5py
 import numpy as np
+import os
 #from galaxy_utils.gal_utils import *
 
 
@@ -173,3 +174,50 @@ def get_scale_bar_size(image_box_size):
         return scale_bar_value, f"{int(scale_bar_value)} kpc"
     else:
         return None
+
+
+
+def get_hybrid_galaxy_centre(sim, path, snap_num):
+    """
+    Get the galaxy centre from the image data file (center_and_proj_(snapnum).hdf5)
+
+    Inputs:
+    params: object, parameters object
+    snap_num: int, snapshot number
+
+    Output:
+    centre: array, galaxy centre
+    """
+    center_dir = "img_data/"
+    filename_prefix = "center_proj_"
+    filename_suffix = ".hdf5"
+    file_path = os.path.join(path, sim, center_dir)
+    fname = file_path+filename_prefix+str(snap_num)+filename_suffix
+    f = h5py.File(fname,'r')
+    #f.keys()
+    centre = np.array(f['centering'])
+    return centre
+
+
+def get_hybrid_galaxy_proj_matrix(sim, path, snap_num):
+    """
+    Get the galaxy projection matrix from the image data file (center_and_proj_(snapnum).hdf5)
+
+    Inputs:
+    params: object, parameters object
+    snap_num: int, snapshot number
+
+    Output:
+    proj: array (3x3), projection matrix
+    """
+    center_dir = "img_data/"
+    filename_prefix = "center_proj_"
+    filename_suffix = ".hdf5"
+    file_path = os.path.join(path, sim, center_dir)
+    fname = file_path+filename_prefix+str(snap_num)+filename_suffix
+    f = h5py.File(fname,'r')
+    #f.keys()
+    proj = f['ProjectionMatrix']
+    proj = np.array(proj)
+    return proj
+
