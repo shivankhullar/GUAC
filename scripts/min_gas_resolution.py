@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-min_gas_resolution.py: Find the minimum gas spatial resolution (dm/rho)^(1/3) across snapshots.
+min_gas_resolution.py: Find the minimum gas spatial resolution (dm/rho)^(1/3) and the maximum
+gas density (g/cm^3 and particles/cm^3, n = rho/m_p) across snapshots.
 
 Run from the snapshot directory or pass --snapdir explicitly.
 
@@ -19,6 +20,10 @@ import numpy as np
 from docopt import docopt
 
 from hybrid_sims_utils.read_snap import get_snap_data_hybrid, convert_units_to_physical
+from generic_utils.constants import Msun, kpc, m_p
+
+# Physical code density unit (1e10 Msun / kpc^3) in g/cm^3
+UNIT_DENSITY_CGS = 1e10 * Msun / kpc**3
 
 
 def get_snap_numbers(snapdir):
@@ -53,7 +58,10 @@ def min_resolution_for_snap(snapdir, snap_num):
     res_kpc = (pdata['Masses'] / pdata['Density']) ** (1.0 / 3.0)
     res_pc = res_kpc * 1e3
     res_au = res_pc * 206265.0
-    return float(res_pc.min()), float(res_au.min())
+
+    # Maximum density in g/cm^3, and as a number density n = rho / m_p in cm^-3
+    rho_max_cgs = float(pdata['Density'].max()) * UNIT_DENSITY_CGS
+    return float(res_pc.min()), float(res_au.min()), rho_max_cgs, rho_max_cgs / m_p
 
 
 if __name__ == '__main__':
@@ -72,17 +80,26 @@ if __name__ == '__main__':
     global_min_pc = np.inf
     global_min_au = np.inf
     global_min_snap = -1
+    global_max_rho = -np.inf
+    global_max_n = -np.inf
+    global_max_snap = -1
 
     for snap_num in snap_nums:
-        min_pc = min_resolution_for_snap(snapdir, snap_num)
-        if min_pc is None:
+        result = min_resolution_for_snap(snapdir, snap_num)
+        if result is None:
             continue
-        min_pc, min_au = min_pc
-        print(f'Snapshot {snap_num:04d}:  min resolution = {min_pc:.4f} pc  ({min_au:.2f} AU)')
+        min_pc, min_au, max_rho, max_n = result
+        print(f'Snapshot {snap_num:04d}:  min resolution = {min_pc:.3e} pc  ({min_au:.2f} AU)  |  '
+              f'max density = {max_rho:.3e} g/cm^3  ({max_n:.3e} cm^-3)')
         if min_pc < global_min_pc:
             global_min_pc = min_pc
             global_min_au = min_au
             global_min_snap = snap_num
+        if max_rho > global_max_rho:
+            global_max_rho = max_rho
+            global_max_n = max_n
+            global_max_snap = snap_num
 
     print()
-    print(f'Global minimum resolution: {global_min_pc:.4f} pc  ({global_min_au:.2f} AU)  (snapshot {global_min_snap:04d})')
+    print(f'Global minimum resolution: {global_min_pc:.3e} pc  ({global_min_au:.2f} AU)  (snapshot {global_min_snap:04d})')
+    print(f'Global maximum density:    {global_max_rho:.3e} g/cm^3  ({global_max_n:.3e} cm^-3)  (snapshot {global_max_snap:04d})')

@@ -32,3 +32,4 @@ keV = 1e3*eV
 J = 1e7
 
 Lsun = 3.846e33   #erg/s
+Rsun = 6.957e10   #cm

@@ -41,6 +41,7 @@ from scipy.ndimage import uniform_filter1d
 path_full  = "/mnt/ceph/users/skhullar/projects/SFIRE/m12f/"
 sim_cutout = "output_cutout"
 
+"""
 save_path = "/mnt/home/skhullar/projects/SFIRE/m12f/movies/popIII_fixed/"
 
 SNAP_START = 28
@@ -50,6 +51,17 @@ PC_TO_KPC      = 1e-3
 FIXED_BOX      = 0.2 * PC_TO_KPC   # 0.2 pc in kpc
 SCALEBAR       = 0.1 * PC_TO_KPC   # 0.1 pc in kpc
 RUNAWAY_KPC    = 1.0 * PC_TO_KPC   # ignore stars > 1 pc from cluster COM
+"""
+
+save_path = "/mnt/home/skhullar/projects/SFIRE/m12f/movies/popIII_fixed_bigbox/"
+
+SNAP_START = 28
+SNAP_END   = 1067
+
+PC_TO_KPC      = 1e-3
+FIXED_BOX      = 0.4 * PC_TO_KPC   # 0.4 pc in kpc
+SCALEBAR       = 0.1 * PC_TO_KPC   # 0.1 pc in kpc
+RUNAWAY_KPC    = 0.5 * PC_TO_KPC   # ignore stars > 0.5 pc from cluster COM
 
 GAS_FIELDS = ['Masses', 'Coordinates', 'SmoothingLength', 'Velocities',
               'Density', 'InternalEnergy', 'ElectronAbundance', 'Temperature']
